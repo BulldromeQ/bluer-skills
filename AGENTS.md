@@ -58,7 +58,9 @@ gemini
 ```
 
 The plugin icon (`plugins/claude-code/.claude-plugin/icon.png`, also used in the
-README title) is rendered by `docs/brand/render_icon.py`.
+README title) is three stacked layers that get bluer toward the top: lessons
+build on what the owner wrote. To change it, use a 1024 x 1024 PNG with
+transparent corners, and check that it still reads at 32 px.
 
 The README demo (`docs/demo/bluer-demo.gif`) is a scripted animation that
 `docs/demo/render_demo.py` renders with Pillow and ffmpeg; see the script's
