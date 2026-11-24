@@ -450,6 +450,8 @@ Check each agent's current hook and skill support when its adapter is built.
 | Build in intent mode and base mode; edge-case file | Built |
 | Lessons follow steps by text; archive and restore with the step | Built |
 | Lesson receipts, `bluer forget` (`--last`) and `bluer restore`; `status` lists each lesson | Built; tested live in Claude Code and Gemini CLI |
+| Learning eval (`evals/learning`): 23 two-turn cases with real agents | Built; Claude Code (Sonnet) 23/23 |
+| Lessons listed with ids in the hook notes; `bluer learn <skill> L2` counts a repeat | Built |
 | Session-start message when Node.js is missing or too old; `BLUER_NODE` | Built; tested live in Claude Code and Gemini CLI |
 | `bluer setup`: a private Node.js from nodejs.org, pinned by checksum | Built; tested live in Claude Code |
 | Windows | Planned (hooks need `sh`) |
@@ -504,6 +506,7 @@ IDs are stable: other documents and commits refer to them.
 | D27 | The description lives in `bluer.json`, written by an agent and improved by missed triggers. | It decides triggering, so it must survive rebuilds and improve with use. |
 | D28 | Each lesson gets a one-line receipt that the agent shows word for word; "undo that" forgets the last lesson, and a forgotten lesson stays forgotten. | Users fear "the agent changed my skill". Seeing every change, and undoing it in one sentence, builds more trust than history and rollback alone. |
 | D29 | Users without Node.js get a private copy: `bin/bluer setup` downloads the official release pinned by checksum into `~/.bluer/runtime`, after the user says yes. | Many agents install without Node.js. Official files beat our own binaries for trust, and a ~30 MB download beats a ~100 MB binary per OS and a release pipeline. |
+| D30 | While a bluer skill is in use, the hooks give the agent a note on every user message, with the skill's lessons and their ids; a repeat is recorded by id. | The learning eval showed both gaps: a word list ("never", "always") missed plain corrections such as "move the bug fixes to the end", and an agent rewords a repeat, which bluer then counted as a new lesson. |
 
 ## 12. Open questions
 
@@ -520,3 +523,22 @@ IDs are stable: other documents and commits refer to them.
 
   Plan: use A where an agent supports it, else C, and prove the result with a
   trigger test in each agent.
+
+- **Q2. Skills in phone chat apps.** Many people who do not write code use an AI
+  app on their phone (the Gemini app, ChatGPT, Meta Muse), not a coding agent.
+  The Gemini app and ChatGPT now read `SKILL.md` skills, so a bluer skill can
+  run there, but it does not learn: those apps have no hooks and no local CLI.
+  Candidate paths:
+  - A. `bluer export <skill>`: a folder to add in the Gemini app or ChatGPT,
+    and text to paste where an app takes no skill files. The copy is frozen
+    until the next export.
+  - B. An exported skill that asks the app to offer an update to the skill when
+    the user corrects it, where the app can edit its own skills. This learns,
+    but without bluer's gate, versions and undo.
+  - C. A hosted bluer connector (MCP), which ChatGPT, Claude's apps and Muse
+    accept. This gives real learning on the phone, but needs a server, an
+    account, and the user's skills stored online, which breaks principle
+    "local and private".
+
+  Plan: build A after the agent adapters, test B on a real phone, and decide on
+  C only when there are users who ask for it.

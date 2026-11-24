@@ -83,9 +83,15 @@ bluer learn <skill> "<lesson>" [flags]
 | `--impact high` | It prevented a mistake that would have cost real work |
 | `--impact medium` | It matters, but only in a rare case |
 
-Leave `--always` off for a correction that depends on this situation ("move
-the bug fixes to the end"). Record it again each time it happens: bluer counts
-the repeats, and repeats are how such a lesson becomes a rule.
+Record each correction to how you did the task, even a small one ("move the
+bug fixes to the end", "make it more casual"); the gate keeps rare ones out of
+the skill. Leave `--always` off for a correction that depends on this
+situation. Record nothing for new content for this run, thanks, or questions.
+
+When the user says a lesson the skill already has again, in any words, record
+the repeat by its id: `bluer learn <skill> L2`. The hook note lists the skill's
+lessons with their ids, and so does `bluer status <skill>`. bluer counts the
+repeats, and repeats are how a correction becomes a rule.
 
 ## Undo a lesson
 

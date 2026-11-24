@@ -7,3 +7,4 @@ coverage/
 .env.*
 docs/demo/*.mp4
 __pycache__/
+evals/learning/results/

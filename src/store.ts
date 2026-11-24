@@ -239,7 +239,12 @@ export interface LearnInput extends Omit<LessonInput, "pending" | "step"> {
   step?: string;
 }
 
-/** Record a lesson, run it through the learning gate and rebuild the skill if the gate lets it in. */
+/**
+ * Record a lesson, run it through the learning gate and rebuild the skill if
+ * the gate lets it in. A lesson id ("L2") as the text counts one more sighting
+ * of that lesson, in its own words and at its own step: an agent says the same
+ * thing in new words each time, and only repeats move a lesson up the gate.
+ */
 export function learn(
   ctx: Context,
   name: string,
@@ -249,8 +254,12 @@ export function learn(
   const mode = skill.meta.learning ?? ctx.settings.learning;
   if (mode === "off") throw new BluerError(`Learning is off for "${name}".`);
 
-  const step = resolveStep(skill, input.step);
-  const recorded = recordLesson(skill.lessons, { ...input, step, pending: mode === "review" }, ctx.today, skill.meta.runs);
+  const id = /^L\d+$/i.test(input.text.trim()) ? input.text.trim().toUpperCase() : null;
+  const known = id === null ? undefined : skill.lessons.find((l) => l.id === id);
+  if (id !== null && !known) throw new BluerError(`"${name}" has no lesson ${id}. Run "bluer status ${name}" to see its lessons.`);
+  const step = known ? known.step : resolveStep(skill, input.step);
+  const text = known ? known.text : input.text;
+  const recorded = recordLesson(skill.lessons, { ...input, text, step, pending: mode === "review" }, ctx.today, skill.meta.runs);
   skill.lessons = recorded.lessons;
   skill.meta = { ...skill.meta, lastLesson: recorded.lesson.id };
   const verb = recorded.isNew ? "learned" : "saw again";

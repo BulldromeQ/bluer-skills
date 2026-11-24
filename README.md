@@ -268,6 +268,12 @@ macOS and Linux; Windows is not supported yet.
 **Does anything leave my machine?** No. Sharing lessons with a skill's author is
 planned, and it will always show you the exact text and wait for your yes.
 
+**How do I know it learns the right things?** The
+[learning eval](evals/README.md) runs real agent sessions: stated rules,
+small corrections, one-offs, repeats, undo, thanks and questions, passwords and
+instructions hidden in files. It checks what bluer recorded each time. Claude
+Code with Sonnet passes 23 of 23 ([results](evals/learning/RESULTS.md)).
+
 **Can I use my bluer skills without bluer?** Yes. `SKILL.md` is a normal skill
 file.
 
@@ -280,6 +286,7 @@ to, keeps rare cases out of the way, and versions every change.
 - [x] Design ([docs/design.md](docs/design.md))
 - [x] CLI core: create, learning gate, build, versions, rollback, adopt, link
 - [x] Claude Code plugin: `/bluer:new` in chat, automatic lesson capture, run counting
+- [x] Learning eval: real sessions check what the agent records
 - [ ] Trigger tests, and a test gate on every automatic change
 - [ ] Intent drift reports, size budget for skills
 - [ ] New-skill drafts for work that repeats

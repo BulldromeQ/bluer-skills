@@ -16,7 +16,7 @@ Usage:
   bluer new "<title>, 1. <step>, 2. <step>"   Create a skill from plain steps
         [--name <name>] [--no-link]
   bluer adopt <folder> [--name <name>]          Bring an existing skill into bluer
-  bluer learn <skill> "<lesson>"                Teach a skill something
+  bluer learn <skill> "<lesson>"                Teach a skill something (or give a lesson id, such as L2, to count a repeat)
         [--step <number or text>] [--source answer|correction|failure]
         [--impact low|medium|high] [--always] [--one-off]
   bluer approve <skill> [<id>... | --all]       Approve lessons that wait for review

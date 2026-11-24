@@ -62,6 +62,11 @@ gemini extensions link .
 gemini
 ```
 
+`evals/learning` runs real agent sessions to check what the agent records; see
+`evals/README.md`. Run it after a change to the hook notes
+(`src/agents/hooks.ts`) or to the `bluer` skill, and add a line to
+`evals/learning/RESULTS.md` with `--summary`. A full run costs about $2.
+
 The plugin icon (`plugins/claude-code/.claude-plugin/icon.png`, also used in the
 README title) is three stacked layers that get bluer toward the top: lessons
 build on what the owner wrote. To change it, use a 1024 x 1024 PNG with

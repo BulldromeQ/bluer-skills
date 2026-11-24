@@ -86,6 +86,15 @@ describe("learn", () => {
     assert.equal(git(ctx.home, ["status", "--porcelain"]), "");
   });
 
+  it("counts a repeat given by lesson id, in the lesson's own words and step", () => {
+    const ctx = setup();
+    const { name } = store.createSkill(ctx, HOUSE, { link: false });
+    store.learn(ctx, name, { text: "Wipe with a damp cloth, then dry it", step: "1" });
+    const again = store.learn(ctx, name, { text: "l1" });
+    assert.deepEqual([again.isNew, again.lesson.id, again.lesson.seen, again.lesson.step, again.tier], [false, "L1", 2, "clean the table", "edge"]);
+    assert.throws(() => store.learn(ctx, name, { text: "L7" }), /has no lesson L7/);
+  });
+
   it("rejects a step the skill does not have", () => {
     const ctx = setup();
     const { name } = store.createSkill(ctx, HOUSE, { link: false });

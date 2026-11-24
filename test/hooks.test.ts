@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { after, describe, it } from "node:test";
 import { claudeCode } from "../src/agents/claude-code.ts";
 import { geminiCli } from "../src/agents/gemini-cli.ts";
-import { handleHook, installShim, lastAssistantAsked, looksLikeLesson, pruneState, shimPath, type HookEvent } from "../src/agents/hooks.ts";
+import { handleHook, installShim, lastAssistantAsked, pruneState, shimPath, type HookEvent } from "../src/agents/hooks.ts";
 import type { AgentAdapter } from "../src/agents/types.ts";
 import { run } from "../src/cli.ts";
 import { DEFAULT_SETTINGS } from "../src/home.ts";
@@ -95,13 +95,14 @@ describe("user-prompt-submit", () => {
     assert.equal(hook(ctx, "user-prompt-submit", { session_id: "s1", prompt: "no, never do that" }), "");
   });
 
-  it("reminds the agent when a message in a bluer session looks like a lesson", () => {
+  it("notes each message in a session that uses a bluer skill, and no other session", () => {
     const { ctx } = setup();
     hook(ctx, "post-tool-use", { session_id: "s1", tool_name: "Skill", tool_input: { skill: "weekly-update" } });
-    const out = contextOf(hook(ctx, "user-prompt-submit", { session_id: "s1", prompt: "No, keep it under 150 words" }));
-    assert.equal(out.hookEventName, "UserPromptSubmit");
-    assert.match(out.additionalContext, /teaches the skill "weekly-update"/);
-    assert.equal(hook(ctx, "user-prompt-submit", { session_id: "s1", prompt: "thanks, looks good" }), "");
+    for (const prompt of ["No, keep it under 150 words", "Move the bug fixes to the end", "thanks, looks good"]) {
+      const out = contextOf(hook(ctx, "user-prompt-submit", { session_id: "s1", prompt }));
+      assert.equal(out.hookEventName, "UserPromptSubmit");
+      assert.match(out.additionalContext, /the skill "weekly-update" is in use.*If the message teaches nothing, ignore this note\.$/);
+    }
     assert.equal(hook(ctx, "user-prompt-submit", { session_id: "other", prompt: "No, keep it short" }), "");
   });
 
@@ -109,9 +110,11 @@ describe("user-prompt-submit", () => {
     const { ctx, root } = setup();
     hook(ctx, "post-tool-use", { session_id: "s1", tool_name: "Skill", tool_input: { skill: "weekly-update" } });
     const asked = transcript(root, "Who should get the update?");
-    assert.notEqual(hook(ctx, "user-prompt-submit", { session_id: "s1", prompt: "my team and Sam", transcript_path: asked }), "");
+    const answer = contextOf(hook(ctx, "user-prompt-submit", { session_id: "s1", prompt: "my team and Sam", transcript_path: asked }));
+    assert.match(answer.additionalContext, /Your last message asked a question: .*--source answer/);
     const told = transcript(root, "Here is your update.");
-    assert.equal(hook(ctx, "user-prompt-submit", { session_id: "s1", prompt: "my team and Sam", transcript_path: told }), "");
+    const plain = contextOf(hook(ctx, "user-prompt-submit", { session_id: "s1", prompt: "my team and Sam", transcript_path: told }));
+    assert.doesNotMatch(plain.additionalContext, /asked a question/);
   });
 
   it("counts '/<skill>' typed by the user as loading the skill", () => {
@@ -119,7 +122,8 @@ describe("user-prompt-submit", () => {
     const out = contextOf(hook(ctx, "user-prompt-submit", { session_id: "s1", prompt: "/weekly-update for this week" }));
     assert.match(out.additionalContext, /"weekly-update" is a bluer skill/);
     assert.equal(runs(ctx), 1);
-    assert.equal(hook(ctx, "user-prompt-submit", { session_id: "s1", prompt: "/help" }), "");
+    assert.doesNotMatch(hook(ctx, "user-prompt-submit", { session_id: "s1", prompt: "/help" }), /is a bluer skill/);
+    assert.equal(runs(ctx), 1, "/help does not count as a run");
   });
 });
 
@@ -151,12 +155,18 @@ describe("session-end", () => {
   });
 });
 
-describe("lesson detection", () => {
-  it("spots corrections and rules in English and Chinese", () => {
-    for (const text of ["No, shorter", "Never send it", "always CC Sam", "use bullets instead", "too long", "不要发给全组", "下次记住"]) {
-      assert.ok(looksLikeLesson(text), text);
-    }
-    for (const text of ["thanks", "looks good", "send it", "know-how"]) assert.ok(!looksLikeLesson(text), text);
+describe("lesson notes", () => {
+  it("notes every message while a bluer skill is in use, and lists its lessons with ids", () => {
+    const { ctx } = setup();
+    store.learn(ctx, "weekly-update", { text: "Move the bug fixes to the end", step: "2" });
+    store.learn(ctx, "weekly-update", { text: "Keep it under 150 words", explicit: true });
+    const loaded = contextOf(hook(ctx, "post-tool-use", { session_id: "n1", tool_name: "Skill", tool_input: { skill: "weekly-update" } }));
+    assert.match(loaded.additionalContext, /What the skill has learned: L2 \(rule\): Keep it under 150 words \| L1 \(candidate\): Move the bug fixes to the end\./);
+    assert.match(loaded.additionalContext, /record the repeat by id, for example: .* learn weekly-update L2/);
+    const nudge = contextOf(hook(ctx, "user-prompt-submit", { session_id: "n1", prompt: "Move the bug fixes to the end." }));
+    assert.match(nudge.additionalContext, /the skill "weekly-update" is in use/);
+    assert.match(nudge.additionalContext, /L1 \(candidate\): Move the bug fixes to the end/);
+    assert.doesNotMatch(nudge.additionalContext, /last message asked a question/);
   });
 
   it("reads a missing transcript as no question", () => {
