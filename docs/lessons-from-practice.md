@@ -1,8 +1,7 @@
 # Lessons from maintaining agent skills in practice
 
 These lessons come from maintaining a large set of Claude Code skills and agent
-memory files for a real engineering team. Each one shaped a part of the bluer
-design. Facts about Claude Code were true as of late 2026; check them against
+memory files. Each one shaped a part of the bluer design. Facts about Claude Code were true as of late 2026; check them against
 the current documentation before you rely on them.
 
 ## Triggering

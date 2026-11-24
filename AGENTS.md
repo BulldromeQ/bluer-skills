@@ -55,7 +55,8 @@ BLUER_HOME=/tmp/bt/bluer BLUER_USER_HOME=/tmp/bt/user \
 
 The plugin icon (`plugins/claude-code/.claude-plugin/icon.png`, also used in the
 README title) is three stacked layers that get bluer toward the top: lessons
-build on what the owner wrote. To change it, use a 1024 x 1024 PNG with
+build on what the owner wrote. The project owner made it for bluer, and it is
+under the repo's MIT license. To change it, use a 1024 x 1024 PNG with
 transparent corners, and check that it still reads at 32 px.
 
 The README demo (`docs/demo/bluer-demo.gif`) is a scripted animation that
