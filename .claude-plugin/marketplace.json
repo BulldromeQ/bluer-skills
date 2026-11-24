@@ -1,6 +1,6 @@
 {
   "name": "bluer-skills",
-  "description": "bluer: agent skills you write in plain steps, that improve themselves with use.",
+  "description": "bluer skills: agent skills you write in plain steps, that improve themselves with use.",
   "owner": {
     "name": "BulldromeQ"
   },
@@ -8,7 +8,7 @@
     {
       "name": "bluer",
       "source": "./plugins/claude-code",
-      "description": "Agent skills you write in plain steps, that improve themselves with use."
+      "description": "bluer skills: agent skills you write in plain steps, that improve themselves with use."
     }
   ]
 }

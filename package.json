@@ -1,15 +1,18 @@
 {
   "name": "bluer-skills",
   "version": "0.0.0",
-  "description": "Agent skills you write in plain steps, that improve themselves with use.",
+  "description": "bluer skills: agent skills you write in plain steps, that improve themselves with use.",
   "keywords": [
+    "bluer-skills",
+    "bluer",
     "agent-skills",
     "skills",
     "claude-code",
     "gemini-cli",
     "codex",
     "self-improving",
-    "ai-agents"
+    "ai-agents",
+    "claude-code-plugin"
   ],
   "license": "MIT",
   "author": "BulldromeQ",

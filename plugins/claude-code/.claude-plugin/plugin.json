@@ -1,11 +1,18 @@
 {
   "name": "bluer",
-  "description": "Agent skills you write in plain steps, that improve themselves with use. Create a skill from a few lines, and bluer records what your agent learns while it uses the skill.",
+  "description": "bluer skills: agent skills you write in plain steps, that improve themselves with use. Create a skill from a few lines, and bluer records what your agent learns while it uses the skill.",
   "author": {
     "name": "BulldromeQ"
   },
   "homepage": "https://github.com/BulldromeQ/bluer-skills",
   "repository": "https://github.com/BulldromeQ/bluer-skills",
   "license": "MIT",
-  "keywords": ["skills", "self-improving", "learning", "agent-skills"]
+  "keywords": [
+    "bluer",
+    "bluer-skills",
+    "skills",
+    "self-improving",
+    "learning",
+    "agent-skills"
+  ]
 }

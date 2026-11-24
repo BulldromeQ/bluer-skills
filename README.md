@@ -1,6 +1,7 @@
 # bluer
 
-**Agent skills you write in three lines, that get better every time they run.**
+**bluer skills: agent skills you write in three lines, that get better every time they run.**
+For Claude Code today; Gemini CLI, OpenAI Codex, Cursor and GitHub Copilot next.
 
 [![CI](https://github.com/BulldromeQ/bluer-skills/actions/workflows/ci.yml/badge.svg)](https://github.com/BulldromeQ/bluer-skills/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
