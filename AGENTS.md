@@ -36,6 +36,11 @@ BLUER_HOME=/tmp/bt/bluer BLUER_USER_HOME=/tmp/bt/user \
   claude --plugin-dir ./plugins/claude-code
 ```
 
+The README demo (`docs/demo/bluer-demo.gif`) is a scripted animation that
+`docs/demo/render_demo.py` renders with Pillow and ffmpeg; see the script's
+header. Keep its agent lines true to what the plugin really does, and render it
+again when the story changes.
+
 `BLUER_USER_HOME` moves the folder where bluer links skills for agents, so a
 test does not touch your real `~/.claude/skills`. To let a test session see a
 skill, link it into the project: `.claude/skills/<name>`.

@@ -5,3 +5,5 @@ coverage/
 .DS_Store
 .env
 .env.*
+docs/demo/*.mp4
+__pycache__/

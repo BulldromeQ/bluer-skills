@@ -9,6 +9,8 @@ For Claude Code today; Gemini CLI, OpenAI Codex, Cursor and GitHub Copilot next.
 > 青出于蓝而胜于蓝: *blue comes from the indigo plant, yet it is bluer than the plant.*
 > You write the plant. bluer makes it bluer.
 
+![Demo: three plain steps become a skill. One correction becomes two rules, the next week's draft follows them, and adding a fourth step keeps everything learned.](docs/demo/bluer-demo.gif)
+
 You write a skill the way you would tell a person. Your agent uses it, asks
 questions, gets corrected, makes mistakes. bluer turns each of those into a
 lesson and folds the good ones back into the skill. Your own short version stays
