@@ -36,6 +36,9 @@ BLUER_HOME=/tmp/bt/bluer BLUER_USER_HOME=/tmp/bt/user \
   claude --plugin-dir ./plugins/claude-code
 ```
 
+The plugin icon (`plugins/claude-code/.claude-plugin/icon.png`, also used in the
+README title) is rendered by `docs/brand/render_icon.py`.
+
 The README demo (`docs/demo/bluer-demo.gif`) is a scripted animation that
 `docs/demo/render_demo.py` renders with Pillow and ffmpeg; see the script's
 header. Keep its agent lines true to what the plugin really does, and render it

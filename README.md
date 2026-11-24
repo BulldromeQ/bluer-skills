@@ -1,4 +1,4 @@
-# bluer
+# <img src="plugins/claude-code/.claude-plugin/icon.png" alt="" width="44"> bluer
 
 **bluer skills: agent skills you write in three lines, that get better every time they run.**
 For Claude Code today; Gemini CLI, OpenAI Codex, Cursor and GitHub Copilot next.
