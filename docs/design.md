@@ -437,7 +437,8 @@ An agent that cannot run a hook on each message gets a fallback: at the end of a
 session (or the start of the next one), the adapter scans the session log for
 lessons. This is enough for a first version of such an adapter.
 
-Order: Claude Code, Gemini CLI, then OpenAI Codex, Cursor and GitHub Copilot.
+Order: Claude Code, Gemini CLI, then OpenAI Codex. Other agents are open to
+contributors; [adding-an-agent.md](adding-an-agent.md) says how.
 Check each agent's current hook and skill support when its adapter is built.
 
 ## 10. Status
@@ -469,7 +470,8 @@ Check each agent's current hook and skill support when its adapter is built.
 | Shared skills, `upstream/`, `intent.local.md`, sharing levels | Planned |
 | Secret removal in lessons | Planned |
 | Gemini CLI extension: `bluer` skill, `/bluer:new`, `/bluer:teach`, `/bluer:status`, capture hooks, run counting | Built; tested live with `gemini -p` |
-| Adapters for Codex, Cursor, Copilot | Planned |
+| OpenAI Codex adapter | Planned (next) |
+| Adapters for other agents (Antigravity, Cursor, Copilot) | Open to contributors |
 
 ## 11. Decision log
 
@@ -507,6 +509,7 @@ IDs are stable: other documents and commits refer to them.
 | D28 | Each lesson gets a one-line receipt that the agent shows word for word; "undo that" forgets the last lesson, and a forgotten lesson stays forgotten. | Users fear "the agent changed my skill". Seeing every change, and undoing it in one sentence, builds more trust than history and rollback alone. |
 | D29 | Users without Node.js get a private copy: `bin/bluer setup` downloads the official release pinned by checksum into `~/.bluer/runtime`, after the user says yes. | Many agents install without Node.js. Official files beat our own binaries for trust, and a ~30 MB download beats a ~100 MB binary per OS and a release pipeline. |
 | D30 | While a bluer skill is in use, the hooks give the agent a note on every user message, with the skill's lessons and their ids; a repeat is recorded by id. | The learning eval showed both gaps: a word list ("never", "always") missed plain corrections such as "move the bug fixes to the end", and an agent rewords a repeat, which bluer then counted as a new lesson. |
+| D31 | The project builds adapters for Claude Code, Gemini CLI and OpenAI Codex only; other agents are left to contributors, with a guide. | A small team keeps three adapters working well; the adapter interface and the learning eval let others add more. |
 
 ## 12. Open questions
 

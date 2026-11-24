@@ -123,12 +123,14 @@ record it again. To bring it back when the user asks, run
 
 ## How a skill learns
 
-Change these only when the user asks. They live in `~/.bluer/settings.json`;
-a skill's own `bluer.json` can override `learning`.
+Change these only when the user asks.
 
-- `learning`: `auto` (default: lessons apply at once), `review` (they wait for
-  the user's approval) or `off`.
-- `gate`: `balanced` (default), `strict` (slower to make rules) or `eager`.
+- How a skill learns: `bluer learning <skill> auto|review|off`, or
+  `bluer learning --all auto|review|off` for every skill. `auto` (the default)
+  applies lessons at once; `review` makes them wait for the user's approval;
+  `off` stops learning.
+- How strict the gate is lives in `~/.bluer/settings.json`, key `gate`:
+  `balanced` (default), `strict` (slower to make rules) or `eager`.
 
 ## Bring in an existing skill
 

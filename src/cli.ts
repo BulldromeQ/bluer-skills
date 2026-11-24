@@ -5,7 +5,7 @@ import { claudeCode } from "./agents/claude-code.ts";
 import { handleHook, HOOK_EVENTS, type HookEvent, type HookInput } from "./agents/hooks.ts";
 import { findAgent } from "./agents/index.ts";
 import { BluerError } from "./errors.ts";
-import { defaultHome, initHome, loadSettings } from "./home.ts";
+import { defaultHome, initHome, LEARNING_MODES, loadSettings, type LearningMode } from "./home.ts";
 import { IMPACTS, LESSON_SOURCES, type Impact, type Lesson, type LessonSource } from "./lessons.ts";
 import * as store from "./store.ts";
 import { todayIso } from "./text.ts";
@@ -22,6 +22,7 @@ Usage:
   bluer approve <skill> [<id>... | --all]       Approve lessons that wait for review
   bluer forget <skill> [<id>... | --last]       Undo lessons the user does not want
   bluer restore <skill> <id>...                 Bring back forgotten lessons
+  bluer learning <skill> auto|review|off         Set how a skill learns (--all: the default for every skill)
   bluer used <skill>                            Count one use of a skill
   bluer build <skill>                           Rebuild SKILL.md, for example after you edit intent.md
   bluer add-step <skill> "<step>"               Add a step at the end of intent.md (only when the owner asks)
@@ -183,6 +184,19 @@ export function run(
       if (ids !== "all" && ids.length === 0) throw new BluerError("Give lesson ids to approve, or --all.");
       const result = store.approve(ctx, name, ids);
       out(`Approved ${result.approved.join(", ")}. ${result.version === null ? "SKILL.md did not change." : `SKILL.md is now v${result.version}.`}`);
+      return;
+    }
+    case "learning": {
+      const given = values.all ? args[0] : args[1];
+      if (!LEARNING_MODES.includes(given as LearningMode)) {
+        throw new BluerError("Give a mode: bluer learning <skill> auto|review|off, or bluer learning --all auto|review|off.");
+      }
+      const mode = given as LearningMode;
+      const name = values.all ? null : need(args[0], "the skill name");
+      store.setLearning(ctx, name, mode);
+      const one = { auto: "learns on its own", review: "asks you before it uses a new lesson", off: "no longer learns" }[mode];
+      const all = { auto: "learn on their own", review: "ask you before they use a new lesson", off: "no longer learn" }[mode];
+      out(name === null ? `Your skills ${all}, except a skill that has its own setting.` : `"${name}" ${one}.`);
       return;
     }
     case "used": {

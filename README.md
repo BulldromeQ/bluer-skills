@@ -1,7 +1,7 @@
 # <img src="plugins/claude-code/.claude-plugin/icon.png" alt="" width="44"> bluer
 
 **bluer skills: agent skills you write in three lines, that get better every time they run.**
-For Claude Code and Gemini CLI today; OpenAI Codex, Cursor and GitHub Copilot next.
+For Claude Code and Gemini CLI today, and OpenAI Codex next.
 
 [![CI](https://github.com/BulldromeQ/bluer-skills/actions/workflows/ci.yml/badge.svg)](https://github.com/BulldromeQ/bluer-skills/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -26,48 +26,87 @@ weekly-update learned: "keep it under 150 words". It does this every time now. S
 bluer never changes your own steps, and every change is a version you can roll
 back.
 
-> **Status: early.** The Claude Code plugin and the Gemini CLI extension work:
-> create skills in chat, and your agent records what it learns while it uses
-> them. Other agents and the npm package come later. See the [roadmap](#roadmap).
+> **Status: early.** It works in Claude Code and Gemini CLI. OpenAI Codex comes
+> next. See the [roadmap](#roadmap).
 
-## Install
+## Get started
 
-bluer runs on [Node.js](https://nodejs.org) 20 or later. You do not need to
-install it first. If your computer does not have it, bluer tells you when your
-agent starts. Say "set up bluer", and it downloads Node.js from nodejs.org for
-bluer only. It changes nothing else on your computer.
+| Your agent | Status | Install |
+|---|---|---|
+| Claude Code | Works | [Steps](#claude-code) |
+| Gemini CLI | Works | [Steps](#gemini-cli) |
+| OpenAI Codex | Next | Not yet |
+| Google Antigravity, Cursor, GitHub Copilot, others | Open to contributors | [Add an agent](docs/adding-an-agent.md) |
+
+You do not need to install anything else first. bluer runs on
+[Node.js](https://nodejs.org). If your computer does not have it, bluer tells
+you when your agent starts. Say "set up bluer", and it downloads Node.js for
+bluer only.
 
 ### Claude Code
 
-In Claude Code, run:
+1. **Install.** In Claude Code, type these two lines:
 
-```text
-/plugin marketplace add BulldromeQ/bluer-skills
-/plugin install bluer@bluer-skills
-```
+   ```text
+   /plugin marketplace add BulldromeQ/bluer-skills
+   /plugin install bluer@bluer-skills
+   ```
 
-Or, on Claude Code 2.1.275 or later, in one step:
-
-```text
-/plugin install bluer --marketplace BulldromeQ/bluer-skills
-```
+   Restart Claude Code when it asks.
+2. **Make your first skill.** Ask in plain words: *"Make a skill for my weekly
+   update email: 1. read my notes from this week, 2. write a short summary,
+   3. email it to my team."*
+3. **Allow bluer once.** Claude Code asks before it runs the `bluer` command for
+   the first time. Choose **"Yes, and don't ask again"**.
+4. **Use it.** Ask for the task ("write my weekly update"), or type
+   `/weekly-update-email`. Correct it the way you would correct a person.
 
 ### Gemini CLI
 
-In a terminal, run:
+1. **Install.** In a terminal, run:
 
-```bash
-gemini extensions install https://github.com/BulldromeQ/bluer-skills
-```
+   ```bash
+   gemini extensions install https://github.com/BulldromeQ/bluer-skills
+   ```
 
-The extension adds the `bluer` skill and `/bluer:new`, `/bluer:teach` and
-`/bluer:status`. bluer links your skills into `~/.agents/skills`, where Gemini
-CLI finds them.
+2. **Start Gemini CLI** and ask: *"Make a skill for my weekly update email:
+   1. read my notes from this week, 2. write a short summary, 3. email it to my
+   team."*
+3. **Allow bluer once.** Gemini CLI asks before it runs the `bluer` command.
+   Choose **"Allow for all future sessions"**.
+4. **Use it.** Ask for the task, or type `/weekly-update-email`.
 
-### Then
+Google is moving Gemini CLI users to Antigravity CLI. Gemini CLI support stays
+for the accounts that still have it. Antigravity reads the same skills folder,
+and an Antigravity adapter is open to contributors.
 
-Then just ask: *"Make a skill for my weekly update email: 1. read my notes from
-this week, 2. write a short summary, 3. email it to my team."*
+### Everyday use
+
+Talk to your agent. This works the same in every agent:
+
+| To do this | Say this | Or type |
+|---|---|---|
+| Make a skill | "Make a skill for my weekly update: 1. ..., 2. ..., 3. ..." | `/bluer:new` |
+| Use a skill | "Write my weekly update" | `/weekly-update-email` |
+| Teach it | Correct it, the way you would correct a person ("keep it under 150 words") | `/bluer:teach` |
+| See what it learned | "What has my weekly update skill learned?" | `/bluer:status` |
+| Undo a lesson | "Undo that" | |
+| Go back to an earlier version | "Roll my weekly update skill back to yesterday" | |
+| Add a step | "Add a step to my weekly update: 4. add my plan for next week" | |
+| Approve each lesson first | "Ask me before my weekly update skill learns something" | |
+| Stop learning | "Stop my weekly update skill from learning" | |
+
+Each time a skill learns something, your agent shows you a one-line receipt.
+
+**Where your skills live.** Each skill is a folder in `~/.bluer/skills/`.
+`intent.md` holds your own steps: open it and edit it whenever you like.
+`SKILL.md` is the detailed skill that bluer builds for your agent; do not edit
+it. bluer links each skill into your agent's skills folder, so the agent finds
+it.
+
+**Other agents.** A bluer skill is a standard [Agent Skills](https://agentskills.io)
+`SKILL.md`, so any agent that reads skills can use it. It learns only in an
+agent where bluer is installed.
 
 ## Why
 
@@ -197,13 +236,7 @@ You can make the gate `strict` or `eager`. The default is `balanced`.
 - **Skills from other people** *(planned).* Keep the author's version, add your
   own lessons on top, and still get the author's updates.
 
-| Agent | Status |
-|---|---|
-| Claude Code | Works: plugin with `/bluer:new`, `/bluer:teach`, `/bluer:status` and automatic lesson capture |
-| Gemini CLI | Works: extension with `/bluer:new`, `/bluer:teach`, `/bluer:status` and automatic lesson capture |
-| OpenAI Codex | Planned |
-| Cursor | Planned |
-| GitHub Copilot | Planned |
+See [Get started](#get-started) for the agents bluer works with.
 
 ## Try the CLI
 
@@ -237,6 +270,7 @@ agent can use it at once. Add `--no-link` to skip that.
 | `bluer history <skill>` / `bluer rollback <skill> <version>` | See and undo versions |
 | `bluer forget <skill> --last` / `bluer restore <skill> <id>` | Undo a lesson, or bring it back |
 | `bluer approve <skill> --all` | Approve lessons that wait for review |
+| `bluer learning <skill> review` | Make a skill ask before it uses a new lesson (`auto`, `review` or `off`; `--all` for every skill) |
 | `bluer adopt <folder>` | Bring an existing skill into bluer |
 | `bluer link <skill> --replace` | Swap an agent's copy of a skill for the bluer one |
 
@@ -292,12 +326,15 @@ to, keeps rare cases out of the way, and versions every change.
 - [ ] New-skill drafts for work that repeats
 - [ ] Shared skills with a personal layer
 - [x] Gemini CLI extension
-- [ ] OpenAI Codex, Cursor and GitHub Copilot adapters
+- [ ] OpenAI Codex adapter
+- Other agents: open to contributors ([how to add one](docs/adding-an-agent.md))
 
 ## Contributing
 
 Read [AGENTS.md](AGENTS.md) for how to build and test, and
 [docs/design.md](docs/design.md) for how bluer works and what is still open.
+To bring bluer to another agent, read
+[docs/adding-an-agent.md](docs/adding-an-agent.md).
 [docs/lessons-from-practice.md](docs/lessons-from-practice.md) explains the
 hard-won rules behind the design.
 

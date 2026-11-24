@@ -8121,6 +8121,20 @@ function resolveStep(skill, step) {
   }
   return found;
 }
+function setLearning(ctx, name, mode) {
+  if (name === null) {
+    initHome(ctx.home);
+    const file = join6(ctx.home, "settings.json");
+    writeFileSync2(file, JSON.stringify({ ...loadSettings(ctx.home), learning: mode }, null, 2) + "\n");
+    ctx.settings = { ...ctx.settings, learning: mode };
+    commitPaths(ctx.home, ["settings.json"], `learning for all skills: ${mode}`);
+    return;
+  }
+  const skill = loadSkill(ctx, name);
+  skill.meta = { ...skill.meta, learning: mode };
+  writeMeta(skill);
+  commitPaths(ctx.home, [skillPathInRepo(name)], `${name}: learning ${mode}`);
+}
 function approve(ctx, name, ids) {
   const skill = loadSkill(ctx, name);
   const approved = [];
@@ -8404,6 +8418,7 @@ Usage:
   bluer approve <skill> [<id>... | --all]       Approve lessons that wait for review
   bluer forget <skill> [<id>... | --last]       Undo lessons the user does not want
   bluer restore <skill> <id>...                 Bring back forgotten lessons
+  bluer learning <skill> auto|review|off         Set how a skill learns (--all: the default for every skill)
   bluer used <skill>                            Count one use of a skill
   bluer build <skill>                           Rebuild SKILL.md, for example after you edit intent.md
   bluer add-step <skill> "<step>"               Add a step at the end of intent.md (only when the owner asks)
@@ -8540,6 +8555,19 @@ function run(argv, env = process.env, out = console.log, readStdin = () => readF
       if (ids !== "all" && ids.length === 0) throw new BluerError("Give lesson ids to approve, or --all.");
       const result = approve(ctx, name, ids);
       out(`Approved ${result.approved.join(", ")}. ${result.version === null ? "SKILL.md did not change." : `SKILL.md is now v${result.version}.`}`);
+      return;
+    }
+    case "learning": {
+      const given = values.all ? args[0] : args[1];
+      if (!LEARNING_MODES.includes(given)) {
+        throw new BluerError("Give a mode: bluer learning <skill> auto|review|off, or bluer learning --all auto|review|off.");
+      }
+      const mode = given;
+      const name = values.all ? null : need(args[0], "the skill name");
+      setLearning(ctx, name, mode);
+      const one = { auto: "learns on its own", review: "asks you before it uses a new lesson", off: "no longer learns" }[mode];
+      const all = { auto: "learn on their own", review: "ask you before they use a new lesson", off: "no longer learn" }[mode];
+      out(name === null ? `Your skills ${all}, except a skill that has its own setting.` : `"${name}" ${one}.`);
       return;
     }
     case "used": {

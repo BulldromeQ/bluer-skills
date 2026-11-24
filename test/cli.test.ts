@@ -39,6 +39,9 @@ describe("bluer CLI", () => {
     );
     assert.match(bluer("restore", "doing-house-work", "L1").stdout, /^doing-house-work remembers again: "Never use bleach"\. It does this every time now\.\n\(SKILL\.md is now v4\.\)/);
     assert.match(bluer("rollback", "doing-house-work", "v1").stdout, /is now v5, with the lessons of v1/);
+    assert.equal(bluer("learning", "doing-house-work", "review").stdout, '"doing-house-work" asks you before it uses a new lesson.\n');
+    assert.equal(bluer("learning", "--all", "off").stdout, "Your skills no longer learn, except a skill that has its own setting.\n");
+    assert.match(bluer("learning", "doing-house-work", "sometimes").stderr, /Give a mode: bluer learning/);
     assert.equal(bluer("list").stdout.trim(), "doing-house-work");
   });
 

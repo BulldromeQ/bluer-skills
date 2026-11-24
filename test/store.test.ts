@@ -114,6 +114,19 @@ describe("learn", () => {
     assert.match(skillFile(ctx, name, "SKILL.md"), /bleach/);
   });
 
+  it("sets learning per skill, or the default for all skills, and the skill's own mode wins", () => {
+    const ctx = setup();
+    const { name } = store.createSkill(ctx, HOUSE, { link: false });
+    store.setLearning(ctx, name, "review");
+    assert.equal(store.learn(ctx, name, { text: "Never use bleach", explicit: true }).tier, "pending");
+    store.setLearning(ctx, null, "off");
+    assert.equal(JSON.parse(readFileSync(join(ctx.home, "settings.json"), "utf8")).learning, "off");
+    assert.equal(store.learn(ctx, name, { text: "Open the window" }).tier, "pending", "the skill's own review mode wins over the default");
+    store.setLearning(ctx, name, "off");
+    assert.throws(() => store.learn(ctx, name, { text: "x" }), /Learning is off/);
+    assert.equal(git(ctx.home, ["status", "--porcelain"]), "");
+  });
+
   it("refuses to learn when learning is off", () => {
     const ctx = setup({ settings: { ...DEFAULT_SETTINGS, learning: "off" } });
     const { name } = store.createSkill(ctx, HOUSE, { link: false });

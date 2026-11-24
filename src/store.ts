@@ -7,7 +7,7 @@ import { BluerError } from "./errors.ts";
 import { splitFrontmatter } from "./frontmatter.ts";
 import { classify, type Tier } from "./gate.ts";
 import { commitPaths, git } from "./git.ts";
-import { backupsDir, initHome, skillsDir, type LearningMode, type Settings } from "./home.ts";
+import { backupsDir, initHome, loadSettings, skillsDir, type LearningMode, type Settings } from "./home.ts";
 import { checkName, formatIntent, parseIntent, slugify, type Intent } from "./intent.ts";
 import { formatLearnings, parseLearnings, recordLesson, type Lesson, type LessonInput } from "./lessons.ts";
 import { normalizeKey, oneLine, sha256 } from "./text.ts";
@@ -328,6 +328,26 @@ function resolveStep(skill: Skill, step: string | undefined): string | null {
     throw new BluerError(`"${skill.name}" has no step "${step}". Its steps are: ${steps.map((s, i) => `${i + 1}. ${s}`).join("; ")}.`);
   }
   return found;
+}
+
+/**
+ * Set how a skill learns (`auto`, `review` or `off`), or, with `name` null, the
+ * default for all skills in settings.json. A skill's own mode wins over the
+ * default.
+ */
+export function setLearning(ctx: Context, name: string | null, mode: LearningMode): void {
+  if (name === null) {
+    initHome(ctx.home);
+    const file = join(ctx.home, "settings.json");
+    writeFileSync(file, JSON.stringify({ ...loadSettings(ctx.home), learning: mode }, null, 2) + "\n");
+    ctx.settings = { ...ctx.settings, learning: mode };
+    commitPaths(ctx.home, ["settings.json"], `learning for all skills: ${mode}`);
+    return;
+  }
+  const skill = loadSkill(ctx, name);
+  skill.meta = { ...skill.meta, learning: mode };
+  writeMeta(skill);
+  commitPaths(ctx.home, [skillPathInRepo(name)], `${name}: learning ${mode}`);
 }
 
 /** Approve pending lessons, all of them or the ones with these ids. */
