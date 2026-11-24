@@ -32,9 +32,10 @@ back.
 
 ## Install
 
-Requires [Node.js](https://nodejs.org) 20 or later. Not sure if you have it?
-Install bluer anyway: if Node.js is missing or too old, bluer tells you when your
-agent starts, with the link to fix it.
+bluer runs on [Node.js](https://nodejs.org) 20 or later. You do not need to
+install it first. If your computer does not have it, bluer tells you when your
+agent starts. Say "set up bluer", and it downloads Node.js from nodejs.org for
+bluer only. It changes nothing else on your computer.
 
 ### Claude Code
 
@@ -255,10 +256,14 @@ before it is used, set the skill to `review`.
 `~/.bluer/bin/bluer`. In Gemini CLI, choose "Allow for all future sessions".
 That path stays the same across updates.
 
-**My agent says bluer needs Node.js. What do I do?** Install the LTS version
-from [nodejs.org](https://nodejs.org), then restart your agent. Until then your
-skills still work, but they do not learn. If Node.js is installed in an unusual
-folder, set `BLUER_NODE` to its full path.
+**My agent says bluer needs Node.js. What do I do?** Say "set up bluer". Your
+agent asks before it downloads anything. bluer then downloads the official
+Node.js from nodejs.org into `~/.bluer/runtime`: a 30 to 60 MB download, about
+140 MB on disk. It checks the file against a checksum pinned in bluer, and
+changes nothing else on your computer. Then restart your agent. You can also
+install Node.js yourself from [nodejs.org](https://nodejs.org). If Node.js is
+installed in an unusual folder, set `BLUER_NODE` to its full path. Setup works on
+macOS and Linux; Windows is not supported yet.
 
 **Does anything leave my machine?** No. Sharing lessons with a skill's author is
 planned, and it will always show you the exact text and wait for your yes.

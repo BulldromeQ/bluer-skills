@@ -39,7 +39,7 @@ export const skillsDir = (home: string): string => join(home, "skills");
 export const backupsDir = (home: string): string => join(home, "backups");
 
 /** Folders in the home that are local to this machine and never versioned: moved-aside agent folders, the CLI shim, hook state. */
-const IGNORED = ["backups/", "bin/", "state/"];
+const IGNORED = ["backups/", "bin/", "runtime/", "state/"];
 
 /** Create the home on first use. Safe to call each time. */
 export function initHome(home: string): { created: boolean } {

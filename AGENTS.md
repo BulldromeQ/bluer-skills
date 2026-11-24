@@ -27,6 +27,11 @@ The Claude Code plugin ships the CLI as one bundled file,
 own folder and no `node_modules`. Run `npm run build:plugin` after any change in
 `src/` and commit the bundle. CI fails when the bundle is out of date.
 
+`bin/bluer setup` downloads the Node.js release pinned in
+`plugins/claude-code/bin/node-pins.txt`. When a new Node.js LTS release is out,
+run `node scripts/pin-node.ts`, check the diff and commit it. Never edit the
+checksums by hand: they are what makes the download safe.
+
 The Gemini CLI extension lives at the repo root, because Gemini CLI installs an
 extension only from a repository root: `gemini-extension.json`,
 `hooks/hooks.json`, `commands/bluer/*.toml` and `skills/bluer/SKILL.md`. Its
@@ -80,8 +85,10 @@ skill, link it into the project: `.claude/skills/<name>`.
 - Tests that touch files use a temp folder and set `home` and `userHome` in the
   `Context`. The CLI reads `BLUER_HOME`, `BLUER_USER_HOME`, `BLUER_TODAY` (a
   fixed date for tests) and `BLUER_CLI_PATH` (the CLI path hooks write into the
-  shim). The wrapper `plugins/claude-code/bin/bluer` reads `BLUER_NODE`: set it
-  to a missing path to test what users without Node.js see. Never let a test write to the real `~/.bluer`, `~/.claude` or `~/.gemini`.
+  shim). The wrapper `plugins/claude-code/bin/bluer` reads `BLUER_NODE` (set
+  it to a missing path to test what users without Node.js see) and
+  `BLUER_NODE_MIRROR` (where `setup` downloads from; tests use a `file://`
+  mirror). Never let a test write to the real `~/.bluer`, `~/.claude` or `~/.gemini`.
 
 ## Rules
 

@@ -7693,7 +7693,7 @@ function defaultHome(env = process.env) {
 }
 var skillsDir = (home) => join5(home, "skills");
 var backupsDir = (home) => join5(home, "backups");
-var IGNORED = ["backups/", "bin/", "state/"];
+var IGNORED = ["backups/", "bin/", "runtime/", "state/"];
 function initHome(home) {
   const created = !existsSync4(join5(home, "settings.json"));
   mkdirSync2(skillsDir(home), { recursive: true });
@@ -8259,9 +8259,10 @@ function installShim(home, cliPath, nodePath = process.execPath) {
   const cli = shellQuote(cliPath);
   const body = `#!/bin/sh
 # Written by a bluer agent plugin at each session start.
-# It runs the bluer CLI that ships with the plugin.
-if command -v node >/dev/null 2>&1; then exec node ${cli} "$@"; fi
-exec ${shellQuote(nodePath)} ${cli} "$@"
+# It runs the bluer CLI that ships with the plugin, with the Node.js the
+# plugin chose (which may be bluer's own, in runtime/), or else node on PATH.
+if [ -x ${shellQuote(nodePath)} ]; then exec ${shellQuote(nodePath)} ${cli} "$@"; fi
+exec node ${cli} "$@"
 `;
   if (!existsSync6(shim) || readFileSync3(shim, "utf8") !== body) writeFileSync3(shim, body);
   chmodSync(shim, 493);

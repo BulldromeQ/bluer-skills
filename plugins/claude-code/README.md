@@ -7,8 +7,8 @@ the skill.
 
 ## Install
 
-Requires Node.js 20 or later. If it is missing or too old, the plugin tells you
-when Claude Code starts.
+Runs on Node.js 20 or later. If it is missing or too old, the plugin tells you
+when Claude Code starts. Say "set up bluer" to download Node.js for bluer only.
 
 ```text
 /plugin marketplace add BulldromeQ/bluer-skills
@@ -31,12 +31,17 @@ when Claude Code starts.
 | `skills/bluer` | Teaches Claude how to create skills, record lessons and stay within the rules |
 | `skills/new`, `teach`, `status` | Short commands that load the `bluer` skill |
 | `hooks/hooks.json` | `SessionStart` writes `~/.bluer/bin/bluer`; `PostToolUse` (Skill) counts a run and tells Claude how to record lessons; `UserPromptSubmit` reminds Claude when a message looks like a lesson; `SessionEnd` rebuilds the skills used |
-| `bin/bluer`, `bin/bluer.mjs` | The bluer CLI, bundled into one file. Built from `src/` with `npm run build:plugin`; do not edit it by hand |
+| `bin/bluer`, `bin/bluer.mjs` | `bin/bluer` finds Node.js and runs `setup`; `bin/bluer.mjs` is the bluer CLI, bundled into one file. Built from `src/` with `npm run build:plugin`; do not edit it by hand |
+| `bin/node-pins.txt` | The Node.js release and checksums that `bin/bluer setup` uses. Made by `scripts/pin-node.ts` |
 
 Hooks never block a session: on any error they print to stderr and exit 0.
 Without a usable Node.js, the `SessionStart` hook shows a message with the fix
 and the other hooks do nothing. Set `BLUER_NODE` to a Node.js path to skip the
 search.
+
+`bin/bluer setup` downloads the Node.js release pinned in `bin/node-pins.txt`
+from nodejs.org, checks its SHA-256 against the pin, and keeps only `bin/node`
+in `~/.bluer/runtime`. bluer uses that Node.js first. It does not change PATH.
 
 ## Privacy
 

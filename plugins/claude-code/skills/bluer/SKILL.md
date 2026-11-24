@@ -31,8 +31,12 @@ A hook note gives the bluer command for this session, usually
 write it as `bluer`. If there is no note, run
 `"${CLAUDE_PLUGIN_ROOT}/bin/bluer" <command>`.
 
-If a command says that Node.js is needed, tell the user to install Node.js 20 or
-later from https://nodejs.org, then try again.
+If a command or a hook note says that Node.js is needed, tell the user, and
+offer two fixes: bluer can download Node.js for itself only (from nodejs.org, a
+30 to 60 MB download, about 140 MB on disk, nothing else changes), or they can
+install Node.js 20 or later from https://nodejs.org. Download only after the
+user says yes: run the `setup` command that the note or the error message
+gives. Then tell them to restart the agent.
 
 ## Rules
 

@@ -94,9 +94,10 @@ export function installShim(home: string, cliPath: string, nodePath: string = pr
   const body =
     "#!/bin/sh\n" +
     "# Written by a bluer agent plugin at each session start.\n" +
-    "# It runs the bluer CLI that ships with the plugin.\n" +
-    `if command -v node >/dev/null 2>&1; then exec node ${cli} "$@"; fi\n` +
-    `exec ${shellQuote(nodePath)} ${cli} "$@"\n`;
+    "# It runs the bluer CLI that ships with the plugin, with the Node.js the\n" +
+    "# plugin chose (which may be bluer's own, in runtime/), or else node on PATH.\n" +
+    `if [ -x ${shellQuote(nodePath)} ]; then exec ${shellQuote(nodePath)} ${cli} "$@"; fi\n` +
+    `exec node ${cli} "$@"\n`;
   if (!existsSync(shim) || readFileSync(shim, "utf8") !== body) writeFileSync(shim, body);
   chmodSync(shim, 0o755);
   return shim;

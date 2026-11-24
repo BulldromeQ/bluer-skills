@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
@@ -47,8 +48,8 @@ describe("session-start", () => {
     assert.equal(hook(ctx, "session-start", { session_id: "s1" }), "");
     const shim = shimPath(ctx.home);
     const body = readFileSync(shim, "utf8");
-    assert.match(body, /then exec node "\/plugin\/bin\/bluer\.mjs" "\$@"; fi/);
-    assert.ok(body.includes(`exec "${process.execPath}" "/plugin/bin/bluer.mjs" "$@"`), "falls back to the Node that ran the hook");
+    assert.ok(body.includes(`if [ -x "${process.execPath}" ]; then exec "${process.execPath}" "/plugin/bin/bluer.mjs" "$@"; fi`), "uses the Node that ran the hook");
+    assert.match(body, /\nexec node "\/plugin\/bin\/bluer\.mjs" "\$@"\n$/, "falls back to node on PATH");
     assert.equal(statSync(shim).mode & 0o111, 0o111);
   });
 
@@ -211,18 +212,18 @@ describe("plugin bin/bluer", () => {
     const start = runBin(env, ["hook", "claude-code", "session-start"]);
     assert.equal(start.status, 0);
     const out = JSON.parse(start.stdout) as { systemMessage: string; hookSpecificOutput: { hookEventName: string; additionalContext: string } };
-    assert.match(out.systemMessage, /^bluer needs Node\.js 20 or later, and this computer does not have it\. .*https:\/\/nodejs\.org, then restart Claude Code\.$/);
+    assert.match(out.systemMessage, /^bluer needs Node\.js 20 or later, and this computer does not have it\. .*ask Claude Code to set up bluer.*Then restart Claude Code\.$/);
     assert.equal(out.hookSpecificOutput.hookEventName, "SessionStart");
-    assert.match(out.hookSpecificOutput.additionalContext, /^bluer cannot run in this session\. .*tell them this first\.$/);
+    assert.match(out.hookSpecificOutput.additionalContext, /^bluer cannot run in this session\. .*tell them this first\. .*: sh "[^"]+\/bin\/bluer" setup\. Then tell the user to restart Claude Code\.$/);
 
     const gemini = JSON.parse(runBin(env, ["hook", "gemini-cli", "session-start"]).stdout) as { systemMessage: string };
-    assert.match(gemini.systemMessage, /restart Gemini CLI\.$/);
+    assert.match(gemini.systemMessage, /Then restart Gemini CLI\.$/);
 
     const prompt = runBin(env, ["hook", "claude-code", "user-prompt-submit"]);
     assert.deepEqual([prompt.status, prompt.stdout, prompt.stderr], [0, "", ""]);
     const cli = runBin(env, ["list"]);
     assert.equal(cli.status, 1);
-    assert.match(cli.stderr, /^bluer: bluer needs Node\.js 20 or later, and this computer does not have it\./);
+    assert.match(cli.stderr, /^bluer: bluer needs Node\.js 20 or later, and this computer does not have it\. .*run: sh "[^"]+\/bin\/bluer" setup\./);
   });
 
   it("names a Node.js that is too old", () => {
@@ -234,6 +235,63 @@ describe("plugin bin/bluer", () => {
     const cli = runBin({ HOME: root, BLUER_NODE: fake }, ["list"]);
     assert.equal(cli.status, 1);
     assert.match(cli.stderr, /has Node\.js v18\.19\.0/);
+  });
+
+  // "bluer setup" against a local mirror: a fake Node.js release whose bin/node prints a version.
+  function fakeRelease(version: string): { bin: string; mirror: string; home: string; pins: string } {
+    const root = tempRoot();
+    const platform = `${process.platform}-${process.arch}`;
+    const name = `node-v${version}-${platform}`;
+    mkdirSync(join(root, "build", name, "bin"), { recursive: true });
+    writeFileSync(join(root, "build", name, "bin", "node"), "#!/bin/sh\necho v26.0.0-fake\n", { mode: 0o755 });
+    writeFileSync(join(root, "build", name, "LICENSE"), "MIT\n");
+    mkdirSync(join(root, "mirror", `v${version}`), { recursive: true });
+    const pins = [`version ${version}`];
+    for (const [ext, flag] of [["tar.xz", "-cJf"], ["tar.gz", "-czf"]] as const) {
+      const archive = join(root, "mirror", `v${version}`, `${name}.${ext}`);
+      const made = spawnSync("tar", [flag, archive, "-C", join(root, "build"), name]);
+      if (made.status === 0) pins.push(`${platform}.${ext} ${createHash("sha256").update(readFileSync(archive)).digest("hex")}`);
+    }
+    // A copy of bin/ with its own pins, so the test never changes the real file.
+    const bin = join(root, "bin");
+    mkdirSync(bin);
+    copyFileSync(script, join(bin, "bluer"));
+    writeFileSync(join(bin, "node-pins.txt"), pins.join("\n") + "\n");
+    return { bin, mirror: `file://${join(root, "mirror")}`, home: join(root, "bluer"), pins: join(bin, "node-pins.txt") };
+  }
+
+  it("sets up a private Node.js from the pinned release, and then uses it", { skip: !["darwin", "linux"].includes(process.platform) || !["arm64", "x64"].includes(process.arch) }, () => {
+    const r = fakeRelease("9.9.9");
+    const env = { ...bare, HOME: tempRoot(), BLUER_HOME: r.home, BLUER_NODE_MIRROR: r.mirror };
+    const setup = spawnSync("/bin/sh", [join(r.bin, "bluer"), "setup", "--force"], { env, encoding: "utf8" });
+    assert.equal(setup.status, 0, setup.stderr);
+    assert.match(setup.stdout, /Node\.js v9\.9\.9 is set up for bluer in .*runtime\/node-v9\.9\.9-.*PATH and the rest of the computer did not change/);
+    const node = join(r.home, "runtime", `node-v9.9.9-${process.platform}-${process.arch}`, "bin", "node");
+    assert.ok(existsSync(node));
+    // The private Node.js now comes before any other: the fake one prints its version for any arguments.
+    const used = spawnSync("/bin/sh", [join(r.bin, "bluer"), "help"], { env, encoding: "utf8" });
+    assert.equal(used.stdout, "v26.0.0-fake\n");
+    const again = spawnSync("/bin/sh", [join(r.bin, "bluer"), "setup"], { env, encoding: "utf8" });
+    assert.match(again.stdout, /already has a usable Node\.js \(v26\.0\.0-fake at .*\)\. Nothing to do\./);
+  });
+
+  it("refuses a download that does not match the pinned checksum", { skip: !["darwin", "linux"].includes(process.platform) || !["arm64", "x64"].includes(process.arch) }, () => {
+    const r = fakeRelease("9.9.8");
+    writeFileSync(r.pins, readFileSync(r.pins, "utf8").replace(/ [0-9a-f]{64}$/gm, ` ${"0".repeat(64)}`));
+    const env = { ...bare, HOME: tempRoot(), BLUER_HOME: r.home, BLUER_NODE_MIRROR: r.mirror };
+    const setup = spawnSync("/bin/sh", [join(r.bin, "bluer"), "setup", "--force"], { env, encoding: "utf8" });
+    assert.equal(setup.status, 1);
+    assert.match(setup.stderr, /does not match the checksum that bluer pins/);
+    assert.ok(!existsSync(join(r.home, "runtime")));
+  });
+
+  it("pins every archive that setup can pick, for the current release", () => {
+    const pins = readFileSync(join(import.meta.dirname, "..", "plugins", "claude-code", "bin", "node-pins.txt"), "utf8");
+    const version = /^version (\d+)\.\d+\.\d+$/m.exec(pins);
+    assert.ok(version && Number(version[1]) >= 20, "the pinned release is Node.js 20 or later");
+    for (const platform of ["darwin-arm64", "darwin-x64", "linux-arm64", "linux-x64"]) {
+      for (const ext of ["tar.xz", "tar.gz"]) assert.match(pins, new RegExp(`^${platform}\\.${ext.replace(".", "\\.")} [0-9a-f]{64}$`, "m"));
+    }
   });
 
   it("uses BLUER_NODE when it points at a usable Node.js", () => {

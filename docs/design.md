@@ -451,7 +451,8 @@ Check each agent's current hook and skill support when its adapter is built.
 | Lessons follow steps by text; archive and restore with the step | Built |
 | Lesson receipts, `bluer forget` (`--last`) and `bluer restore`; `status` lists each lesson | Built; tested live in Claude Code and Gemini CLI |
 | Session-start message when Node.js is missing or too old; `BLUER_NODE` | Built; tested live in Claude Code and Gemini CLI |
-| Prebuilt CLI binaries, so that users need no Node.js | Planned |
+| `bluer setup`: a private Node.js from nodejs.org, pinned by checksum | Built; tested live in Claude Code |
+| Windows | Planned (hooks need `sh`) |
 | Hand-edit detection and saving | Built |
 | Git versions, history, rollback that keeps `intent.md` | Built |
 | Link into each installed agent's skills folder; never overwrite without `--replace` | Built |
@@ -502,6 +503,7 @@ IDs are stable: other documents and commits refer to them.
 | D26 | bluer's own creator writes lessons (source `creator`); an external creator's `SKILL.md` becomes a base. | A rebuild must never wipe the creator's work, and the built-in path keeps one model for everything learned. |
 | D27 | The description lives in `bluer.json`, written by an agent and improved by missed triggers. | It decides triggering, so it must survive rebuilds and improve with use. |
 | D28 | Each lesson gets a one-line receipt that the agent shows word for word; "undo that" forgets the last lesson, and a forgotten lesson stays forgotten. | Users fear "the agent changed my skill". Seeing every change, and undoing it in one sentence, builds more trust than history and rollback alone. |
+| D29 | Users without Node.js get a private copy: `bin/bluer setup` downloads the official release pinned by checksum into `~/.bluer/runtime`, after the user says yes. | Many agents install without Node.js. Official files beat our own binaries for trust, and a ~30 MB download beats a ~100 MB binary per OS and a release pipeline. |
 
 ## 12. Open questions
 

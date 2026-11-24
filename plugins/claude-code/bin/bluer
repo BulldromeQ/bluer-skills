@@ -2,23 +2,40 @@
 # Runs the bluer CLI that ships with this plugin (bluer.mjs, built from src/
 # by "npm run build:plugin"). It needs Node.js 20 or later.
 #
-# An app can start an agent with a PATH that does not hold Node (for example
-# without /opt/homebrew/bin), so when PATH has no `node`, this script also looks
-# in the usual install folders. Set BLUER_NODE to a Node.js path to use only
-# that one.
+# Where Node.js comes from, in this order:
+#   1. BLUER_NODE, when it is set: that path only.
+#   2. The private Node.js that "bluer setup" downloaded into ~/.bluer/runtime.
+#   3. `node` on PATH, then the usual install folders. An app can start an
+#      agent with a PATH that does not hold Node.js (for example without
+#      /opt/homebrew/bin), so PATH alone is not enough.
+#
+# "bluer setup" is for users without Node.js. It downloads the official
+# Node.js release pinned in node-pins.txt from nodejs.org (or BLUER_NODE_MIRROR),
+# checks its SHA-256 against the pin, and keeps only bin/node in
+# ~/.bluer/runtime. It does not touch PATH or anything outside that folder.
+# "setup --force" does it even when a usable Node.js exists.
 #
 # Hooks call this script too ("bluer hook <agent> <event>"). Without a usable
-# Node.js, the session-start hook tells the user, in a message the agent shows,
-# how to fix it. The other hooks exit quietly, so that they never block or
+# Node.js, the session-start hook tells the user how to fix it, in a message the
+# agent also sees. The other hooks exit quietly, so that they never block or
 # clutter a session.
 
 MIN_NODE=20
+BIN_DIR=$(cd "$(dirname "$0")" && pwd)
+SELF="$BIN_DIR/bluer"
+RUNTIME_DIR="${BLUER_HOME:-$HOME/.bluer}/runtime"
 
 find_node() {
   if [ -n "${BLUER_NODE:-}" ]; then
     [ -x "$BLUER_NODE" ] && echo "$BLUER_NODE" && return 0
     return 1
   fi
+  for candidate in "$RUNTIME_DIR"/node-v*/bin/node; do
+    if [ -x "$candidate" ]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
   if command -v node >/dev/null 2>&1; then
     command -v node
     return 0
@@ -70,7 +87,84 @@ agent_name() {
   esac
 }
 
+fail() {
+  echo "bluer setup: $1" >&2
+  exit 1
+}
+
+download() {
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL --retry 2 --connect-timeout 20 --max-time 900 -o "$2" "$1"
+  elif command -v wget >/dev/null 2>&1; then
+    wget -q -T 20 -O "$2" "$1"
+  else
+    fail "Neither curl nor wget is installed, so bluer cannot download Node.js. Install Node.js from https://nodejs.org."
+  fi
+}
+
+sha256_of() {
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1" | awk '{print $1}'
+  elif command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | awk '{print $1}'
+  else
+    openssl dgst -sha256 -r "$1" | awk '{print $1}'
+  fi
+}
+
+setup_node() {
+  if [ "${1:-}" != "--force" ] && [ -z "$(node_problem)" ]; then
+    echo "bluer already has a usable Node.js ($("$NODE" --version) at $NODE). Nothing to do."
+    return 0
+  fi
+  case "$(uname -s)" in
+    Darwin) os=darwin ;;
+    Linux) os=linux ;;
+    *) fail "bluer setup works on macOS and Linux only. Install Node.js from https://nodejs.org." ;;
+  esac
+  case "$(uname -m)" in
+    arm64 | aarch64) arch=arm64 ;;
+    x86_64 | amd64) arch=x64 ;;
+    *) fail "nodejs.org has no Node.js build for this processor ($(uname -m)). Install Node.js with your package manager." ;;
+  esac
+  if [ "$os" = linux ] && ldd --version 2>&1 | grep -qi musl; then
+    fail "This Linux uses musl, and nodejs.org builds need glibc. Install Node.js with your package manager (for example: apk add nodejs)."
+  fi
+  # .tar.xz is half the size. macOS tar always reads it; Linux tar needs xz.
+  if [ "$os" = darwin ] || command -v xz >/dev/null 2>&1; then ext=tar.xz; unpack=xJf; else ext=tar.gz; unpack=xzf; fi
+
+  pins="$BIN_DIR/node-pins.txt"
+  version=$(awk '$1 == "version" { print $2 }' "$pins" 2>/dev/null)
+  pinned=$(awk -v key="$os-$arch.$ext" '$1 == key { print $2 }' "$pins" 2>/dev/null)
+  [ -n "$version" ] && [ -n "$pinned" ] || fail "$pins has no Node.js release for $os-$arch."
+
+  name="node-v$version-$os-$arch"
+  url="${BLUER_NODE_MIRROR:-https://nodejs.org/dist}/v$version/$name.$ext"
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/bluer-node.XXXXXX") || fail "Could not make a temporary folder."
+  trap 'rm -rf "$tmp"' EXIT
+
+  echo "Downloading Node.js v$version for $os-$arch from $url"
+  download "$url" "$tmp/$name.$ext" || fail "Could not download $url. Check the network connection, or install Node.js from https://nodejs.org."
+  actual=$(sha256_of "$tmp/$name.$ext")
+  [ "$actual" = "$pinned" ] || fail "The download does not match the checksum that bluer pins for it, so bluer did not use it. Try again later, or install Node.js from https://nodejs.org."
+  tar -"$unpack" "$tmp/$name.$ext" -C "$tmp" "$name/bin/node" "$name/LICENSE" || fail "Could not unpack $name.$ext."
+  "$tmp/$name/bin/node" --version >/dev/null 2>&1 || fail "The downloaded Node.js does not run on this computer. Install Node.js from https://nodejs.org."
+
+  mkdir -p "$RUNTIME_DIR" || fail "Could not make $RUNTIME_DIR."
+  rm -rf "${RUNTIME_DIR:?}/$name"
+  mv "$tmp/$name" "$RUNTIME_DIR/$name" || fail "Could not move Node.js into $RUNTIME_DIR."
+  for old in "$RUNTIME_DIR"/node-v*; do
+    [ "$old" = "$RUNTIME_DIR/$name" ] || rm -rf "$old"
+  done
+  echo "Node.js v$version is set up for bluer in $RUNTIME_DIR/$name. It is for bluer only: PATH and the rest of the computer did not change. Restart your agent so that your bluer skills start to learn."
+}
+
 NODE=$(find_node) || NODE=""
+
+if [ "$1" = "setup" ]; then
+  setup_node "${2:-}"
+  exit $?
+fi
 
 if [ "$1" = "hook" ]; then
   # Only the session-start hook checks the version, once per session; the other
@@ -78,10 +172,11 @@ if [ "$1" = "hook" ]; then
   if [ "$3" = "session-start" ]; then
     problem=$(node_problem)
     if [ -n "$problem" ]; then
-      fix="Install the LTS version from https://nodejs.org, then restart $(agent_name "$2")."
-      message="$problem Your bluer skills still work, but they do not learn until then. $fix"
-      # No quotes or backslashes in these texts, so they are safe in JSON as they are.
-      printf '{"systemMessage":"%s","hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"bluer cannot run in this session. %s If the user asks to create, teach or use a bluer skill, tell them this first."}}\n' "$message" "$message"
+      agent=$(agent_name "$2")
+      message="$problem Your bluer skills still work, but they do not learn until then. To fix it, ask $agent to set up bluer: it downloads Node.js for bluer only, from nodejs.org (a 30 to 60 MB download, about 140 MB on disk). Or install Node.js yourself from https://nodejs.org. Then restart $agent."
+      context="bluer cannot run in this session. $message If the user asks to create, teach or use a bluer skill, tell them this first. If the user wants bluer to set it up, run this command, which downloads the official Node.js into the bluer folder and checks its checksum: sh \\\"$SELF\\\" setup. Then tell the user to restart $agent."
+      # The texts hold no quotes or backslashes other than the escaped quotes above.
+      printf '{"systemMessage":"%s","hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"%s"}}\n' "$message" "$context"
       exit 0
     fi
   fi
@@ -89,8 +184,8 @@ if [ "$1" = "hook" ]; then
 else
   problem=$(node_problem)
   if [ -n "$problem" ]; then
-    echo "bluer: $problem Install the LTS version from https://nodejs.org and try again." >&2
+    echo "bluer: $problem To download Node.js for bluer only, from nodejs.org (a 30 to 60 MB download, about 140 MB on disk), run: sh \"$SELF\" setup. Or install it from https://nodejs.org." >&2
     exit 1
   fi
 fi
-exec "$NODE" "$(dirname "$0")/bluer.mjs" "$@"
+exec "$NODE" "$BIN_DIR/bluer.mjs" "$@"
