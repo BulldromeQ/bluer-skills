@@ -145,7 +145,8 @@ export function run(argv: string[], env: NodeJS.ProcessEnv = process.env, out: O
       const s = store.status(ctx, need(args[0], "the skill name"));
       const c = s.counts;
       out(`${s.name} v${s.version} (${s.mode === "intent" ? "built from intent.md" : "adopted"}, learning: ${s.learning})`);
-      out(`Lessons: ${c.rule} rules, ${c.edge} edge cases, ${c.candidate} candidates, ${c.pending} pending, ${c.expired} expired, ${c.archived} archived, ${c.ignored} one-off.`);
+      const n = (count: number, word: string, plural = `${word}s`): string => `${count} ${count === 1 ? word : plural}`;
+      out(`Lessons: ${n(c.rule, "rule")}, ${n(c.edge, "edge case")}, ${n(c.candidate, "candidate")}, ${c.pending} pending, ${c.expired} expired, ${c.archived} archived, ${n(c.ignored, "one-off")}.`);
       if (s.handEdited) out("SKILL.md was edited by hand. The next build saves the edit under hand-edits/ and keeps it as a pending lesson.");
       for (const l of s.pending) out(`  pending ${l.id}: ${l.text}`);
       return;

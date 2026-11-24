@@ -1,125 +1,252 @@
 # bluer design
 
-This document records the design decisions made so far and the questions that
-are still open. Change it in the same pull request as the code that changes the
-design.
+This document describes how bluer works and why. Read sections 1 and 2 for the
+model. Read the rest for the parts you work on.
 
-## Goals
+Keep this document true. Change it in the same pull request as the code that
+changes the design, and update the status table in section 10.
+
+**Contents**
+
+1. [The problem and the idea](#1-the-problem-and-the-idea)
+2. [Words we use](#2-words-we-use)
+3. [Principles](#3-principles)
+4. [The skill model](#4-the-skill-model)
+5. [Lifecycle](#5-lifecycle)
+6. [Learning](#6-learning)
+7. [Safety](#7-safety)
+8. [Existing, created and shared skills](#8-existing-created-and-shared-skills)
+9. [Agent adapters](#9-agent-adapters)
+10. [Status](#10-status)
+11. [Decision log](#11-decision-log)
+12. [Open questions](#12-open-questions)
+
+## 1. The problem and the idea
+
+Agent skills (`SKILL.md` files) let an agent do a task the way a person wants.
+Four things make them hard to use today:
+
+- **They are hard to write.** A good skill needs a precise description, clear
+  steps and the right detail. Most people who are not engineers cannot write one.
+- **They are hard to read.** A skill that works well is long and full of detail.
+  Its owner can no longer see, at a glance, what it does.
+- **They go stale or bloat.** The world changes and the skill does not. Or the
+  agent writes every edge case into it until the important rules get lost.
+- **Each agent is different.** A skill and its upkeep do not move from one agent
+  to another.
+
+bluer splits each skill into two layers, after 青出于蓝而胜于蓝 ("blue comes from
+the indigo plant, yet it is bluer than the plant"):
+
+- **蓝, the source:** `intent.md`, the owner's short steps in their own words.
+- **青, the refined result:** `SKILL.md`, which bluer builds from the source plus
+  every lesson that passed the learning gate.
+
+The owner reads and edits the short version. Agents read the detailed one.
+bluer keeps the detailed one current, versioned and short enough to work.
+
+### Goals
 
 - A person who is not a software engineer can create a useful skill by writing a
-  plain list of steps.
-- Once bluer is installed, it learns all the time. Skills improve while they are
-  used, and new skills appear for work that repeats, without the person editing
-  anything by hand.
-- The person's plain version stays readable and under their control.
-- The result works in every major agent, not only in Claude Code.
-- bluer works with the skills and skill-creation tools people already have. It
-  does not ask them to start over.
+  few plain lines.
+- Once installed, bluer learns all the time. Skills improve while they are used,
+  and new skills appear for work that repeats.
+- The owner's version stays short, true and under the owner's control.
+- bluer works in every major agent, and with the skills and tools people already
+  have.
 
-## Non-goals
+### Non-goals
 
-- A new skill file format. bluer writes standard Agent Skills `SKILL.md` files.
-- A hosted service. Skills and lessons stay on the user's machine, unless the
-  user chooses to share them.
+- A new skill format. bluer writes standard [Agent Skills](https://agentskills.io)
+  `SKILL.md` files.
+- A hosted service. Skills and lessons stay on the user's machine unless the user
+  chooses to share them.
 
-## Decisions
+## 2. Words we use
 
-| # | Decision | Reason |
-|---|---|---|
-| D1 | Each skill has two layers: `intent.md` (owner) and `SKILL.md` (built). | The owner's version stays short. Learned detail can grow without making the source hard to read. |
-| D2 | Automatic changes never write to `intent.md`. The agent can draft an `intent.md` only when the user approves it (see "Adopting an existing skill" and route 3 in "Always-on learning"). | The owner must be able to trust that their version means what they wrote. |
-| D3 | `SKILL.md` is the standard Agent Skills format. | Any agent can use a bluer skill, even with bluer not installed. |
-| D4 | Lessons are applied automatically by default. A switch turns this off for one skill or for all skills. | The goal is a system that maintains itself. Each change is a new version, so a bad lesson is easy to undo. |
-| D5 | The core is TypeScript, published to npm as `bluer-skills`. The CLI command is `bluer`. | `npx` gives a one-command install, and most agent tooling lives in the npm ecosystem. |
-| D6 | Lesson capture is a TypeScript rewrite of the ideas in claude-reflect, credited in the README. | One codebase for all agent adapters. claude-reflect is Python and Claude Code only. |
-| D7 | Claude Code first, then Gemini CLI, OpenAI Codex, Cursor and GitHub Copilot. | Claude Code has the most complete hook and skill support to build on. |
-| D8 | License: MIT. | Easy for others to adopt. Same as claude-reflect. |
-| D9 | Skills live in one home, `~/.bluer/skills`, which is a git repo. bluer links each skill into each agent's skill folder. | One copy serves every agent, so a lesson learned in one agent helps the others. |
-| D10 | The host agent does the rewriting, guided by a bluer skill. The CLI handles files, versions and checks only. | bluer needs no API key, which matters for users who are not engineers. |
-| D11 | Each version is a git commit in the skills home. Users see `bluer history` and `bluer rollback`, not git. | Full history for free, with no git knowledge needed. |
-| D12 | Users start from a chat command in their agent (`/bluer new`) or from the CLI (`npx bluer-skills new`). | Chat is the main path for non-engineers. The CLI serves scripts and power users. |
-| D13 | Existing skills can be adopted, and an existing skill-creation skill can be set as the creator of `SKILL.md` v1. | People keep the skills and tools they already use. bluer adds the lifecycle around them. |
-| D14 | Every skill can have a personal layer. A skill from someone else keeps the author's layer and the user's own lessons apart. | A shared skill improves for each user without losing upstream updates. Personal lessons stay private. |
-| D15 | Learning is always on once bluer is installed, not only while a bluer skill is loaded. Each lesson is routed (see "Always-on learning"). | Self-improvement is the core of bluer. It must not depend on the user remembering to start it. |
-| D16 | An auto-applied version must pass the skill's trigger test and negative test. If it fails, bluer keeps the previous version and moves the lesson to review. | This makes auto-apply safe enough to be the default. |
-| D17 | bluer's own instructions (create, rebuild, route lessons) are a bluer skill and learn the same way. | bluer improves the way it works, and it uses its own system every day. |
-| D18 | `intent.md` stays the author's short version in their own words. All detail lives in the layers bluer keeps. When the learned version drifts too far from `intent.md`, bluer tells the user and proposes a change to `intent.md`. The change happens only if the user approves it. | Most `SKILL.md` files are hard for people to read. The short version is the part a person reads and edits, so it must stay short and still be true. |
-| D19 | Every lesson passes a gate before it changes `SKILL.md`. Most one-off edge cases wait as candidates and expire if they do not come back (see "Learning gate"). | Agents tend to write every edge case into a skill. The skill then grows long, and the important rules get lost. |
-| D20 | Route 3 of "Always-on learning" drafts a new skill after the same kind of task happens 3 times. | Fewer repeats would draft skills for one-off work. |
-| D21 | The personal profile (route 4) ships with the Gemini CLI milestone, not in the first Claude Code release. | Claude Code already has its own memory. The profile adds most value when a user has a second agent. |
-| D22 | The user picks a level for three settings: sharing lessons back, test effort and the learning gate (see "Levels"). | Users differ in how much they trust automation, and in how many tokens they want to spend. |
+| Word | Meaning |
+|---|---|
+| Owner | The person a skill belongs to. For a shared skill, its **author** owns `intent.md`. |
+| Intent | `intent.md`: a title, numbered steps and optional notes, in the owner's words. |
+| Built skill | `SKILL.md` and `references/learned-edge-cases.md`, which bluer builds. Agents read these. |
+| Lesson | One thing learned: an answer, a correction, a failure or a hand edit. Stored in `learnings.md`. |
+| Tier | Where the learning gate puts a lesson: rule, edge case, candidate or ignored. |
+| Version | One built state of a skill. Each version is a git commit in the bluer home. |
+| Run | One use of a skill by an agent. Candidates expire by runs as well as by days. |
+| Home | `~/.bluer` (or `$BLUER_HOME`), a git repo that holds every skill. |
+| Creator | The skill that writes the first detail for a new skill: bluer's own, or one the user picks. |
+| Adapter | The code that connects bluer to one agent: install, lesson capture and tests. |
 
-## Skill folder
+## 3. Principles
 
-The bluer home is `~/.bluer` (or `$BLUER_HOME`). It is a git repo:
+1. **The owner's words are never changed automatically.** bluer may propose a
+   change to `intent.md`. It changes the file only after the owner says yes.
+2. **Learn by default, and make every change easy to undo.** Each change is a
+   version, and rollback is one command.
+3. **Keep skills short.** A lesson must earn its place. Rare cases go to a side
+   file, and one-offs are not kept.
+4. **Standard output.** A bluer skill works in any agent, with or without bluer.
+5. **Local and private.** No telemetry. Nothing leaves the machine without a yes.
+6. **No API key.** The host agent does the language work. The CLI does files,
+   versions and checks.
+7. **Work with what exists.** Adopt existing skills, accept other creators, and
+   add a personal layer on top of skills that other people share.
+
+## 4. The skill model
+
+### Home
 
 ```text
-~/.bluer/
-  settings.json     # global settings and levels
-  skills/<name>/    # one folder per skill, linked into each agent's skill folder
-  backups/          # agent skill folders that "bluer link --replace" moved aside (not in git)
+~/.bluer/                 # a git repo
+  settings.json           # global settings and levels (section 7)
+  skills/<name>/          # one folder per skill, linked into each agent's skill folder
+  backups/                # agent skill folders that "bluer link --replace" moved aside (not in git)
 ```
 
-Each skill folder:
+### Skill folder
 
 ```text
 <name>/
-  intent.md       # the plain steps; never changed automatically
-  SKILL.md        # built from the layers below; agents read this file
+  intent.md               # the owner's steps; never changed automatically
+  intent.local.md         # shared skills only: the user's own extra steps
+  SKILL.md                # built; agents read this file
   references/
-    learned-edge-cases.md  # built; rare cases, read only when they come up
-  learnings.md    # this user's lessons, one block each, with tier inputs and status
-  upstream/       # only for a skill from someone else (read-only; not built yet)
+    learned-edge-cases.md # built; rare cases, read only when they come up
+  learnings.md            # this user's lessons, one block each
+  base/SKILL.md           # adopted or externally created skills: the base text, unchanged
+  upstream/               # shared skills only: the author's layer (read-only)
     intent.md
     learnings.md
-  base/SKILL.md   # only for an adopted skill: the original, unchanged
-  hand-edits/     # copies of SKILL.md that someone edited by hand
-  CHANGELOG.md    # one line per version
-  bluer.json      # mode, source, version, run count, hash of the last built SKILL.md
+  hand-edits/             # copies of SKILL.md that someone edited by hand
+  CHANGELOG.md            # one line per version
+  bluer.json              # mode, source, version, run count, description, hash of SKILL.md
 ```
-
-`SKILL.md` is built in this order, later layers winning on conflict:
-`intent.md` (or `base/SKILL.md`) → `upstream/learnings.md` → `learnings.md`.
-
-A lesson belongs to a step by the step's text, not its number, so that adding
-or reordering steps does not move lessons to the wrong step.
 
 The edge-case file has a `learned-` prefix so that it never overwrites a
 reference file that an adopted skill already has.
 
-## Lifecycle
+### Build order
 
-1. **Create.** The user writes a few plain lines. bluer saves them as
-   `intent.md`, and the creator builds `SKILL.md` v1 (see "Creators"). bluer
-   asks only questions it cannot work without; it does not interview the user.
-2. **Use.** An agent loads `SKILL.md` as a normal skill.
-3. **Capture.** bluer records lessons in every session (see "Always-on
-   learning").
-4. **Apply.** Each lesson first passes the learning gate (see "Learning
-   gate"). In `auto` mode, bluer folds the lessons that pass into `SKILL.md`, runs the
-   skill's tests and writes a new version. In `review` mode, lessons wait until
-   the user approves them. In `off` mode, nothing is captured for that skill.
-5. **Change intent.** When the user edits `intent.md` (adds step 4, removes step
-   2), bluer rebuilds `SKILL.md`. Lessons for steps that still exist stay.
-   Lessons for a removed step are archived, not deleted, so they come back if
-   the step comes back.
-6. **Roll back.** The user can return the learned layer to any earlier
-   version. Rollback restores `learnings.md` from that version and builds a new
-   version from it. It never changes `intent.md`: it undoes what was learned,
-   not what the owner wrote.
+`SKILL.md` is built from these layers. A later layer wins on conflict.
 
-## Intent drift
+1. The base: `intent.md` (plus `intent.local.md`), or `base/SKILL.md` for a
+   skill in base mode (section 8).
+2. The description in `bluer.json`, when an agent has written one.
+3. `upstream/learnings.md`, for a shared skill.
+4. `learnings.md`, the user's own lessons.
 
-`intent.md` must stay true. When learned lessons pull the skill away from what
-`intent.md` says, bluer reports it at the end of a session and proposes an edit.
-Signs of drift:
+The build is a pure function: the same layers always give the same files. This
+keeps builds easy to test, to diff and to roll back.
+
+### Steps and lessons
+
+A lesson belongs to a step by the step's text, not its number. Adding or
+reordering steps does not move lessons to the wrong step. When a step is removed,
+its lessons are archived; when the step comes back, so do they.
+
+### Built `SKILL.md`
+
+- Frontmatter: `name`, `description` and `metadata` (`built-by`, `version`),
+  written with a YAML library so that values such as `a: b` are quoted.
+- A notice that the file is built and must not be edited by hand.
+- The title, the owner's notes, then one section per step with that step's
+  rules, then general rules.
+- A pointer to `references/learned-edge-cases.md` when there are edge cases.
+
+## 5. Lifecycle
+
+1. **Create.** The user writes a few plain lines in chat or on the command line.
+   bluer saves them as `intent.md` and builds v1. The creator adds the first
+   detail (section 8). bluer asks only the questions it cannot work without.
+2. **Use.** An agent loads `SKILL.md` as a normal skill. The adapter counts a run.
+3. **Capture.** The adapter records lessons in every session (section 6).
+4. **Gate.** Each lesson gets a tier. Only rules and edge cases change the built
+   skill.
+5. **Apply.** In `auto` mode, bluer builds a new version at once. In `review`
+   mode, new lessons wait as pending until the user approves them. In `off`
+   mode, nothing is captured for that skill.
+6. **Test.** After an automatic change, bluer runs the skill's trigger tests.
+   If they fail, bluer keeps the previous version and moves the lesson to
+   review (section 7).
+7. **Change the intent.** The owner edits `intent.md` (adds step 4, removes step
+   2). bluer rebuilds and keeps every lesson whose step still exists.
+8. **Roll back.** The user returns the learned layer to an earlier version.
+   bluer restores `learnings.md` from that version and builds a new version from
+   it. Rollback never changes `intent.md`: it undoes what was learned, not what
+   the owner wrote. Later lessons come back as new lessons if they happen again.
+
+## 6. Learning
+
+### Lesson sources
+
+From most to least valuable:
+
+1. **Answers to the agent's questions.** "How clean should the table be?" The next
+   run should not have to ask again.
+2. **Corrections from the user.** "No, do not move the papers on the desk."
+3. **The agent's own failures** inside the skill: a command that fails, a step
+   that had to be done again.
+4. **Hand edits to `SKILL.md`.** A rebuild would lose them. bluer detects the
+   edit by its hash, saves a copy in `hand-edits/`, and records a pending lesson
+   that points to it. The agent then turns the edit into real lessons.
+
+### Routes
+
+Capture runs in every session once bluer is installed, not only while a bluer
+skill is loaded. Each lesson takes one route:
+
+1. **A bluer skill was in use.** The lesson goes to that skill. In Claude Code,
+   the adapter knows the skill from the `Skill` tool call.
+2. **No skill was loaded, but a skill covers the task.** The lesson goes to that
+   skill, and bluer records a *missed trigger*. Missed triggers improve the
+   skill's description and become new trigger tests.
+3. **The same kind of task repeats and no skill covers it.** After 3 repeats,
+   bluer drafts a new skill and asks the user once to accept its `intent.md`.
+   To count repeats, the agent writes a one-line summary (goal and main steps)
+   of each task to a local task log. Two tasks are the same kind when their goal
+   and main steps match.
+4. **The lesson is about the user, not a task** (for example, a writing style).
+   It goes to a personal profile, which bluer copies into each agent's memory file
+   (`CLAUDE.md`, `GEMINI.md`, `AGENTS.md`) inside a marked block. This route ships
+   with the second agent, because it adds most value when a user has two agents.
+
+### Learning gate
+
+Agents tend to write every edge case into a skill. The gate keeps the main body
+for real rules:
+
+| Tier | Where it goes | When (level `balanced`) |
+|---|---|---|
+| Rule | Main body of `SKILL.md` | The user said "always", "never" or "remember this"; or the lesson prevented a costly failure (impact `high`); or it was seen 3 times |
+| Edge case | `references/learned-edge-cases.md`, read only when the case comes up | Seen 2 times, or impact `medium` |
+| Candidate | `learnings.md` only; the built skill does not change | Seen once, impact `low` |
+| Ignored | Kept in `learnings.md`, never built | About one run only ("today there is a cake on the table"). A one-off that comes back is no longer a one-off. |
+
+- A candidate expires after 30 days or 10 runs without a sighting. It is kept as
+  `expired`, and becomes active again if it is seen again.
+- Rules and edge cases do not expire. A rule that has not been needed for a long
+  time moves down to the edge-case file.
+- The main body has a size budget (under 500 lines, the size agents load well).
+  When it is full, a new rule replaces a weaker one or goes to the edge-case file.
+
+The level changes the numbers:
+
+| Level | Rule at | Edge case at | Candidate expires after |
+|---|---|---|---|
+| `balanced` (default) | 3 sightings | 2 sightings | 30 days or 10 runs |
+| `strict` | 4 | 3 | 14 days or 5 runs |
+| `eager` | 2 | 2 | 60 days or 20 runs |
+
+### Intent drift
+
+`intent.md` must stay true. When lessons pull the skill away from what the intent
+says, bluer reports it at the end of a session and proposes an edit. Signs of
+drift:
 
 - The user corrects the same step again and again in the same direction.
 - A step is always skipped, or the agent always adds a step the intent does not
   name.
 - A lesson contradicts the words of a step.
-
-The report shows the step, the evidence and a proposed new line, for example:
 
 ```text
 Step 2 says "clean the restroom". You told me 4 times to also restock the
@@ -127,155 +254,204 @@ paper towels. Change step 2 to "clean the restroom and restock paper towels"?
 [yes] [no] [edit]
 ```
 
-bluer changes `intent.md` only after a yes. For a skill from someone else, a yes
-does not change the author's version. It is offered to the author instead,
-following the user's sharing level.
+bluer changes `intent.md` only after a yes. For a shared skill, a yes does not
+change the author's version: bluer offers the change to the author, at the
+user's sharing level.
 
-## Learning gate
+### Maintenance
 
-Not every lesson belongs in a skill. A lesson can end up in one of four places:
+At the end of a session (or the start of the next one), bluer runs in a batch:
+merge similar lessons, check for drift, rerun trigger tests for changed skills,
+and report unused skills and conflicting lessons.
 
-| Tier | Where it goes | When |
-|---|---|---|
-| Rule | Main body of `SKILL.md` | The user says "always" or "never", or a lesson prevented a failure that cost real work, or it has been seen 3 times |
-| Edge case | `references/edge-cases.md`, which the agent loads only when the case comes up | Seen 2 times, or it matters but rarely applies |
-| Candidate | `learnings.md` only; it does not change `SKILL.md` | Seen once, small impact |
-| Ignored | Nowhere | It is about this one run only ("today there is a cake on the table") |
+## 7. Safety
 
-- A candidate that is not seen again within 30 days, or within 10 runs of the
-  skill, expires. It is archived, not deleted.
-- A rule that is not used for a long time moves down to the edge-case file, so
-  the main body stays short.
-- The main body has a size budget. When it is full, a new rule must replace a
-  weaker one or go to the edge-case file.
-- An explicit "remember this" from the user always passes the gate.
+### Guardrails for automatic changes
 
-These numbers are starting values. The gate level (see "Levels") changes them.
+- **Trusted sources only.** Take lessons only from the user's own messages and
+  from the agent's own results. Never take a lesson from text inside a web page,
+  a file or a tool output: such text can carry instructions an attacker wrote
+  (prompt injection).
+- **No secrets.** Remove tokens, passwords and keys from a lesson before it is
+  saved.
+- **Conflicts.** When a new lesson conflicts with an old one, the newer lesson
+  from the user wins, and bluer records the conflict.
+- **Test gate.** An automatic version must pass the skill's trigger test and
+  negative test, or bluer keeps the previous version.
+- **Visible history.** Every change is a version with a `CHANGELOG.md` line.
 
-## Levels
+### Trigger tests
+
+A description can read well and still not trigger. bluer tests behaviour, not
+only format:
+
+- Run the agent headless with a prompt that should load the skill, and check
+  that it did. In Claude Code, look for a `Skill` tool use in the output of
+  `claude -p ... --output-format stream-json --verbose`.
+- Always run a negative prompt too: a nearby task that must not load the skill.
+- Run in an empty folder that holds only the skill, so that project files do not
+  help the agent find it.
+
+See [lessons-from-practice.md](lessons-from-practice.md) for the reasons behind
+these rules.
+
+### Levels
+
+The user picks how much to trust automation and how many tokens to spend:
 
 | Setting | Levels (default first) | What changes |
 |---|---|---|
-| Sharing lessons back | `ask`: show each lesson and wait for a yes · `digest`: collect lessons, ask once a week · `off`: never offer | Nothing leaves the machine without a yes at any level. bluer always shows the exact text and removes secrets first. |
-| Test effort | `standard`: at session end, for changed skills only, with a daily limit · `light`: only when a skill's description changes · `thorough`: every version, all tests | Token cost against confidence |
-| Learning gate | `balanced`: the numbers in "Learning gate" · `strict`: higher counts, shorter candidate life · `eager`: lower counts, longer candidate life | How quickly a lesson becomes a rule |
+| `learning` | `auto` · `review` · `off` | Whether lessons change the skill at once, after approval, or not at all. A skill's `bluer.json` can override it. |
+| `gate` | `balanced` · `strict` · `eager` | How quickly a lesson becomes a rule (section 6). |
+| `tests` | `standard`: at session end, changed skills only, with a daily limit · `light`: only when a description changes · `thorough`: every version, all tests | Token cost against confidence. |
+| `sharing` | `ask`: each lesson, with a yes · `digest`: once a week · `off`: never offer | How lessons are offered to a shared skill's author. At every level, nothing leaves without a yes, and bluer shows the exact text first. |
 
-## Adopting an existing skill
+## 8. Existing, created and shared skills
 
-`bluer adopt <path>` (or `/bluer adopt` in chat) brings an existing skill into
-bluer:
+A skill has one of two **modes**:
 
-1. bluer saves the original `SKILL.md` unchanged as version 0.
+- **intent mode:** built from `intent.md` plus lessons. This is the normal mode.
+- **base mode:** built from a fixed base text (`base/SKILL.md`) plus lessons. Used
+  for adopted skills whose intent is not approved yet, and for skills that an
+  external creator wrote.
+
+### Adopting an existing skill
+
+`bluer adopt <folder>` (or `/bluer adopt` in chat):
+
+1. bluer copies the skill into the home and keeps the original `SKILL.md`
+   unchanged as `base/SKILL.md` and as version 0. The original folder is not
+   touched; `bluer link --replace` swaps it for the bluer copy.
 2. The agent drafts a short `intent.md` from it and shows it to the user.
-3. If the user approves, the skill becomes a normal two-layer bluer skill.
-4. If the user does not approve, the original `SKILL.md` stays the base, and
-   lessons are added on top of it.
+3. With a yes, the skill moves to intent mode. Without one, it stays in base mode
+   and lessons are added on top.
 
-A skill that a plugin or marketplace installed is read-only, because its
-installer updates it. bluer does not move it. It treats the skill as upstream and
-adds a personal layer, the same way as for a shared skill.
+### Creators
 
-## Creators
+A new skill needs more than its steps: a good description, and detail for each
+step. The creator writes that first detail.
 
-The creator writes `SKILL.md` v1 from `intent.md`. bluer has a built-in creator,
-and the user can choose another one in the global settings: for example
-Anthropic's `skill-creator`, or their own skill-creation skill. bluer gives the
-creator the intent and receives a `SKILL.md`. Then bluer runs its own checks and
-owns everything after v1: lessons, rebuilds, versions and rollback.
+- **bluer's own creator** writes its detail as lessons with the source `creator`
+  and a description in `bluer.json`. The skill stays in intent mode, so the gate,
+  drift checks and rollback treat the creator's work like any other lesson.
+- **An external creator** (for example Anthropic's `skill-creator`, or the user's
+  own) returns a full `SKILL.md`. bluer stores it as `base/SKILL.md` and keeps
+  `intent.md` next to it for the owner. When the owner changes `intent.md`,
+  bluer asks the creator to write a new base, then applies the lessons again.
 
-## Shared skills
+### The description
 
-A user can install a skill someone else wrote. The author's `intent.md` and
-learnings go into `upstream/`, and `bluer update` refreshes them. The user's own
-lessons go into the top-level `learnings.md` and never leave the machine unless
-the user exports them. When a personal lesson conflicts with an upstream one,
-the personal lesson wins for that user.
+The description decides when an agent loads a skill. bluer writes a simple one
+from the intent. An agent replaces it with a better one in `bluer.json`, and
+missed triggers improve it later. A rebuild never overwrites it.
 
-## Always-on learning
+### Shared skills
 
-Capture runs in every session once bluer is installed. Each lesson takes one of
-four routes:
+A user can install a skill someone else wrote:
 
-1. **A bluer skill was in use.** The lesson goes to that skill. In Claude Code,
-   bluer knows which skill is in use from the `Skill` tool call.
-2. **No skill was loaded, but an existing skill covers the task.** The lesson
-   goes to that skill. bluer also records a *missed trigger*, which shows that
-   the skill's description needs improvement.
-3. **The same kind of task repeats and no skill covers it.** bluer drafts a new
-   skill and asks the user once to accept its `intent.md`, because the intent is
-   in the user's own words.
-4. **The lesson is about the user, not a task** (for example, a writing style).
-   It goes to a personal profile. bluer copies the profile into each agent's
-   memory file (`CLAUDE.md`, `GEMINI.md`, `AGENTS.md`) inside a marked block.
+- The author's `intent.md` and learnings go into `upstream/`, which is read-only.
+  `bluer update` refreshes it.
+- The user's own lessons go into the top-level `learnings.md` and stay on the
+  machine. A personal lesson wins over an upstream one for that user.
+- The user can add their own steps in `intent.local.md`. They come after the
+  author's steps, and they stay local.
+- Good personal lessons can be offered to the author, at the user's sharing
+  level.
 
-Maintenance runs in a batch at the end of a session, or at the start of the
-next one: merge similar lessons, rerun trigger tests, report skills that are not
-used, and report lessons that conflict.
+A skill that a plugin or marketplace installed is treated the same way: the
+plugin's text is the upstream layer, and the user's lessons are the personal
+layer. Section 12 explains why this case is still open.
 
-## Lesson sources
+## 9. Agent adapters
 
-From most to least valuable:
+Each agent gets one adapter. An adapter provides:
 
-1. **Answers to the agent's questions.** "How clean should the table be?" The
-   answer is a lesson the next run should not have to ask for.
-2. **Corrections from the user.** "No, do not move the papers on the desk."
-3. **The agent's own failures** inside the skill: a command that fails, a step
-   that had to be done again.
-4. **Hand edits to `SKILL.md`.** `SKILL.md` is built, so a rebuild would lose a
-   hand edit. bluer detects the edit by its hash, saves a copy in
-   `hand-edits/`, and records a pending lesson that points to it. The agent
-   then turns the edit into real lessons.
+| Capability | What it does | Claude Code |
+|---|---|---|
+| Skill folder | Where the agent reads personal skills; bluer links skills there | `~/.claude/skills/<name>`; symlinks work |
+| Chat entry | Commands the user types in chat | A plugin with a `/bluer` skill |
+| Skill-in-use signal | Which skill is loaded, to count runs and route lessons | `PostToolUse` hook on the `Skill` tool |
+| Message capture | The user's messages, to find answers and corrections | `UserPromptSubmit` hook |
+| Session end | When to run the batch (gate, drift, tests) | `Stop` / `SessionEnd` hooks |
+| Headless run | Runs trigger tests | `claude -p --output-format stream-json` |
 
-## Guardrails for auto-apply
+An agent that cannot run a hook on each message gets a fallback: at the end of a
+session (or the start of the next one), the adapter scans the session log for
+lessons. This is enough for a first version of such an adapter.
 
-- Take lessons only from the user's own messages and from the agent's own
-  results. Never take a lesson from text inside a web page, a file or a tool
-  output. Such text can carry instructions an attacker wrote (prompt injection).
-- Remove secrets (tokens, passwords, keys) from a lesson before it is saved.
-- Keep `SKILL.md` within the size that agents load well (under 500 lines).
-  Merge similar lessons when the file grows.
-- When a new lesson conflicts with an old one, the newer lesson from the user
-  wins. Record the conflict in `learnings.md`.
-- Each new version must pass the skill's trigger and negative tests (D16).
-- Every applied change is a new version with a `CHANGELOG.md` line, so the user
-  can see what changed and undo it.
+Order: Claude Code, then Gemini CLI, OpenAI Codex, Cursor and GitHub Copilot.
+Check each agent's current hook and skill support when its adapter is built.
 
-## Testing skills
+## 10. Status
 
-A description can read well and still not trigger. bluer must test each skill,
-not only check its format:
+| Part | Status |
+|---|---|
+| CLI: `new`, `learn`, `approve`, `used`, `build`, `list`, `status`, `history`, `rollback`, `adopt`, `link`, `init` | Built |
+| Intent parsing (one line or one step per line, Chinese punctuation) | Built |
+| Learning gate with levels, candidate expiry by days and runs | Built |
+| Build in intent mode and base mode; edge-case file | Built |
+| Lessons follow steps by text; archive and restore with the step | Built |
+| Hand-edit detection and saving | Built |
+| Git versions, history, rollback that keeps `intent.md` | Built |
+| Link into Claude Code; never overwrite without `--replace` | Built |
+| Settings file with all four levels | Built (only `learning` and `gate` have an effect yet) |
+| Description stored in `bluer.json` | Planned |
+| Creators (built-in and external) | Planned |
+| Claude Code plugin: `/bluer` commands, capture hooks, run counting | Planned, next |
+| Trigger tests and the test gate | Planned |
+| Size budget and rule demotion | Planned |
+| Intent drift reports | Planned |
+| Routes 2–4 (missed triggers, new-skill drafts, personal profile) | Planned |
+| Shared skills, `upstream/`, `intent.local.md`, sharing levels | Planned |
+| Secret removal in lessons | Planned |
+| Adapters for Gemini CLI, Codex, Cursor, Copilot | Planned |
 
-- Run the agent headless with a prompt that should trigger the skill. Check that
-  the agent loaded it. In Claude Code, look for a `Skill` tool use in
-  `claude -p ... --output-format stream-json --verbose`.
-- Always run a negative prompt too, a nearby task that must not trigger it.
-- Test in an empty directory that holds only the skill, so project files do not
-  help the agent find it.
-- Missed triggers from route 2 of "Always-on learning" become new test prompts.
+## 11. Decision log
 
-See [lessons-from-practice.md](lessons-from-practice.md) for the details behind
-these rules.
+IDs are stable: other documents and commits refer to them.
 
-## Open questions
+| # | Decision | Reason |
+|---|---|---|
+| D1 | Each skill has two layers: `intent.md` (owner) and `SKILL.md` (built). | The owner's version stays short while learned detail grows. |
+| D2 | Automatic changes never write to `intent.md`. An agent may draft one only with the user's yes. | The owner must trust that their version means what they wrote. |
+| D3 | `SKILL.md` is the standard Agent Skills format. | A bluer skill works in any agent, even without bluer. |
+| D4 | Lessons apply automatically by default; a switch turns this off per skill or for all. | The goal is a system that maintains itself; versions make mistakes easy to undo. |
+| D5 | TypeScript core on npm as `bluer-skills`; the command is `bluer`. | One-command install with `npx`; most agent tooling lives on npm. |
+| D6 | Lesson capture is a TypeScript rewrite of ideas from claude-reflect, credited. | One codebase for every adapter; claude-reflect is Python and Claude Code only. |
+| D7 | Claude Code first, then Gemini CLI, OpenAI Codex, Cursor, GitHub Copilot. | Claude Code has the most complete hook and skill support. |
+| D8 | MIT license. | Easy to adopt. |
+| D9 | One home, `~/.bluer`, a git repo, linked into each agent's skill folder. | One copy serves every agent. |
+| D10 | The host agent does the language work; the CLI does files, versions and checks. | No API key, which matters for non-engineers. |
+| D11 | Each version is a git commit; users see `history` and `rollback`, not git. | Full history with no git knowledge. |
+| D12 | Users start in chat (`/bluer new`) or on the CLI (`npx bluer-skills new`). | Chat for non-engineers; the CLI for scripts and power users. |
+| D13 | Existing skills can be adopted; an existing skill-creation skill can be the creator. | People keep the skills and tools they have. |
+| D14 | A shared skill keeps the author's layer and the user's lessons apart. | It improves for each user without losing upstream updates. |
+| D15 | Learning is always on, not only while a bluer skill is loaded; lessons are routed. | Self-improvement must not depend on the user remembering to start it. |
+| D16 | An automatic version must pass its trigger and negative tests, or it is not kept. | Makes auto-apply safe enough to be the default. |
+| D17 | bluer's own instructions are a bluer skill and learn the same way. | bluer improves how it works, and uses its own system daily. |
+| D18 | When the learned version drifts from `intent.md`, bluer proposes an edit; it changes the file only with a yes. | The short version must stay true. |
+| D19 | Every lesson passes the learning gate; one-off edge cases wait and expire. | Skills stay short and keep their important rules. |
+| D20 | Route 3 drafts a new skill after 3 repeats of the same kind of task. | Fewer repeats would draft skills for one-off work. |
+| D21 | The personal profile ships with the second agent's adapter. | Claude Code already has memory; the profile helps most across agents. |
+| D22 | Users choose levels for learning, gate, tests and sharing. | Users differ in trust and in token budget. |
+| D23 | A user's own steps on a shared skill go in `intent.local.md`, after the author's steps. | The user can extend a shared skill without forking it. |
+| D24 | Two tasks are "the same kind" when the one-line summaries of their goal and main steps match. | Gives route 3 a count that means something. |
+| D25 | Agents without per-message hooks scan the session log at session end. | Good enough for a first adapter; better than no capture. |
+| D26 | bluer's own creator writes lessons (source `creator`); an external creator's `SKILL.md` becomes a base. | A rebuild must never wipe the creator's work, and the built-in path keeps one model for everything learned. |
+| D27 | The description lives in `bluer.json`, written by an agent and improved by missed triggers. | It decides triggering, so it must survive rebuilds and improve with use. |
 
-- **Q1. Two copies of one skill.** A personal layer on a plugin skill needs a
-  second skill with the same purpose, because the plugin owns the original file
-  and replaces it on each update. The agent may then pick the original (and
-  ignore the user's lessons), load both (and get conflicting instructions), or
-  keep a stale copy after a plugin update. Duplicate names also behave
-  differently in each agent. Candidate fixes, per agent:
+## 12. Open questions
+
+- **Q1. Two copies of a plugin skill.** A plugin owns its skill file and replaces
+  it on each update, so a personal layer needs a second, built copy. The agent may
+  then pick the original and ignore the user's lessons, load both and get
+  conflicting instructions, or keep a stale copy after a plugin update. Duplicate
+  names also behave differently in each agent. Candidate fixes, per agent:
   - A. Turn off the original. Some agents can only turn off a whole plugin.
   - B. Hide the original by giving the copy the same name, where the agent's
     rules let the copy win.
-  - C. Patch the plugin's file in place and patch it again after each update.
+  - C. Patch the plugin's file in place, and patch it again after each update.
   - D. Add a notes-only companion skill. Nothing makes the agent load both.
 
   Plan: use A where an agent supports it, else C, and prove the result with a
   trigger test in each agent.
-- **Q2. A user's own steps on a shared skill.** D18 covers the author's short
-  version. Can a user who is not the author add a step of their own (for
-  example, a local `4.`) without forking the skill?
-- **Q3. "The same kind of task."** How does route 3 decide that three tasks are
-  the same kind, so the repeat count of D20 is meaningful?
-- **Q4. Agents with weak hooks.** Some agents cannot run a hook on each message.
-  Is a scan of the session log at the end of the session good enough there?

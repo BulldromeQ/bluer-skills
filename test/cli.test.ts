@@ -25,7 +25,7 @@ describe("bluer CLI", () => {
   it("runs the main loop end to end", () => {
     assert.match(bluer("new", "Doing house work, 1. clean the table, 2. clean the kitchen", "--no-link").stdout, /Created "doing-house-work" v1/);
     assert.match(bluer("learn", "doing-house-work", "Never use bleach", "--always").stdout, /now a rule in SKILL\.md\.\nSKILL\.md is now v2\./);
-    assert.match(bluer("status", "doing-house-work").stdout, /doing-house-work v2 .*\nLessons: 1 rules/);
+    assert.match(bluer("status", "doing-house-work").stdout, /doing-house-work v2 .*\nLessons: 1 rule, 0 edge cases, 0 candidates/);
     assert.match(bluer("history", "doing-house-work").stdout, /v1 {2}2026-11-24 {2}created from intent\.md\nv2/);
     assert.match(bluer("rollback", "doing-house-work", "v1").stdout, /is now v3, with the lessons of v1/);
     assert.equal(bluer("list").stdout.trim(), "doing-house-work");

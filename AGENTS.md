@@ -34,7 +34,8 @@ node src/main.ts help
 ## Rules
 
 - Change `docs/design.md` in the same pull request as a change to the design.
-  Add a row to "Decisions" when you settle an open question.
+  Update its status table (section 10) when a planned part is built, and add a
+  row to the decision log (section 11) when you settle an open question.
 - Generated `SKILL.md` files must follow the open Agent Skills format. Do not add
   fields that only bluer understands; put bluer settings in `bluer.json`.
 - The agent never writes to a user's `intent.md`. Code that writes to it is a bug.
