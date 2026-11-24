@@ -43,6 +43,11 @@ design.
 | D15 | Learning is always on once bluer is installed, not only while a bluer skill is loaded. Each lesson is routed (see "Always-on learning"). | Self-improvement is the core of bluer. It must not depend on the user remembering to start it. |
 | D16 | An auto-applied version must pass the skill's trigger test and negative test. If it fails, bluer keeps the previous version and moves the lesson to review. | This makes auto-apply safe enough to be the default. |
 | D17 | bluer's own instructions (create, rebuild, route lessons) are a bluer skill and learn the same way. | bluer improves the way it works, and it uses its own system every day. |
+| D18 | `intent.md` stays the author's short version in their own words. All detail lives in the layers bluer keeps. When the learned version drifts too far from `intent.md`, bluer tells the user and proposes a change to `intent.md`. The change happens only if the user approves it. | Most `SKILL.md` files are hard for people to read. The short version is the part a person reads and edits, so it must stay short and still be true. |
+| D19 | Every lesson passes a gate before it changes `SKILL.md`. Most one-off edge cases wait as candidates and expire if they do not come back (see "Learning gate"). | Agents tend to write every edge case into a skill. The skill then grows long, and the important rules get lost. |
+| D20 | Route 3 of "Always-on learning" drafts a new skill after the same kind of task happens 3 times. | Fewer repeats would draft skills for one-off work. |
+| D21 | The personal profile (route 4) ships with the Gemini CLI milestone, not in the first Claude Code release. | Claude Code already has its own memory. The profile adds most value when a user has a second agent. |
+| D22 | The user picks a level for three settings: sharing lessons back, test effort and the learning gate (see "Levels"). | Users differ in how much they trust automation, and in how many tokens they want to spend. |
 
 ## Skill folder
 
@@ -50,7 +55,9 @@ design.
 ~/.bluer/skills/<skill-name>/
   intent.md       # the plain steps; never changed automatically
   SKILL.md        # built from the layers below; agents read this file
-  learnings.md    # this user's lessons, one entry each
+  references/
+    edge-cases.md # built; rare cases, loaded only when they come up
+  learnings.md    # this user's lessons (rules, edge cases, candidates)
   upstream/       # only for a skill from someone else (read-only)
     intent.md
     learnings.md
@@ -72,7 +79,8 @@ design.
 2. **Use.** An agent loads `SKILL.md` as a normal skill.
 3. **Capture.** bluer records lessons in every session (see "Always-on
    learning").
-4. **Apply.** In `auto` mode, bluer folds new lessons into `SKILL.md`, runs the
+4. **Apply.** Each lesson first passes the learning gate (see "Learning
+   gate"). In `auto` mode, bluer folds the lessons that pass into `SKILL.md`, runs the
    skill's tests and writes a new version. In `review` mode, lessons wait until
    the user approves them. In `off` mode, nothing is captured for that skill.
 5. **Change intent.** When the user edits `intent.md` (adds step 4, removes step
@@ -80,6 +88,58 @@ design.
    Lessons for a removed step are archived, not deleted, so they come back if
    the step comes back.
 6. **Roll back.** The user can return `SKILL.md` to any earlier version.
+
+## Intent drift
+
+`intent.md` must stay true. When learned lessons pull the skill away from what
+`intent.md` says, bluer reports it at the end of a session and proposes an edit.
+Signs of drift:
+
+- The user corrects the same step again and again in the same direction.
+- A step is always skipped, or the agent always adds a step the intent does not
+  name.
+- A lesson contradicts the words of a step.
+
+The report shows the step, the evidence and a proposed new line, for example:
+
+```text
+Step 2 says "clean the restroom". You told me 4 times to also restock the
+paper towels. Change step 2 to "clean the restroom and restock paper towels"?
+[yes] [no] [edit]
+```
+
+bluer changes `intent.md` only after a yes. For a skill from someone else, a yes
+does not change the author's version. It is offered to the author instead,
+following the user's sharing level.
+
+## Learning gate
+
+Not every lesson belongs in a skill. A lesson can end up in one of four places:
+
+| Tier | Where it goes | When |
+|---|---|---|
+| Rule | Main body of `SKILL.md` | The user says "always" or "never", or a lesson prevented a failure that cost real work, or it has been seen 3 times |
+| Edge case | `references/edge-cases.md`, which the agent loads only when the case comes up | Seen 2 times, or it matters but rarely applies |
+| Candidate | `learnings.md` only; it does not change `SKILL.md` | Seen once, small impact |
+| Ignored | Nowhere | It is about this one run only ("today there is a cake on the table") |
+
+- A candidate that is not seen again within 30 days, or within 10 runs of the
+  skill, expires. It is archived, not deleted.
+- A rule that is not used for a long time moves down to the edge-case file, so
+  the main body stays short.
+- The main body has a size budget. When it is full, a new rule must replace a
+  weaker one or go to the edge-case file.
+- An explicit "remember this" from the user always passes the gate.
+
+These numbers are starting values. The gate level (see "Levels") changes them.
+
+## Levels
+
+| Setting | Levels (default first) | What changes |
+|---|---|---|
+| Sharing lessons back | `ask`: show each lesson and wait for a yes · `digest`: collect lessons, ask once a week · `off`: never offer | Nothing leaves the machine without a yes at any level. bluer always shows the exact text and removes secrets first. |
+| Test effort | `standard`: at session end, for changed skills only, with a daily limit · `light`: only when a skill's description changes · `thorough`: every version, all tests | Token cost against confidence |
+| Learning gate | `balanced`: the numbers in "Learning gate" · `strict`: higher counts, shorter candidate life · `eager`: lower counts, longer candidate life | How quickly a lesson becomes a rule |
 
 ## Adopting an existing skill
 
@@ -177,21 +237,24 @@ these rules.
 
 ## Open questions
 
-- **Q1. Two copies of one skill.** A personal version of a plugin skill is a
-  second skill with the same purpose. How do we stop the agent from loading both
-  (for example, by disabling the original, or by giving the personal version a
-  more specific description)? This needs a test in each agent.
-- **Q2. Changing the steps of a shared skill.** Can the user add or remove steps
-  in a skill from someone else? If so, how does `bluer update` merge the
-  author's new steps with the user's changes?
-- **Q3. Sending lessons back.** Should bluer offer to send good personal lessons
-  to the skill's author, for example as a pull request? It must show the user
-  exactly what would leave the machine first.
-- **Q4. When to draft a new skill.** How many repeats of a task before route 3
-  drafts a skill, and how does bluer decide that two tasks are "the same kind"?
-- **Q5. Personal profile timing.** Is route 4 part of the first Claude Code
-  release, or a later one? It overlaps with each agent's own memory features.
-- **Q6. Test cost.** Each trigger test is a headless agent run and costs tokens.
-  How often do we run them, and can a user set a budget?
-- **Q7. Agents with weak hooks.** Some agents cannot run a hook on each message.
+- **Q1. Two copies of one skill.** A personal layer on a plugin skill needs a
+  second skill with the same purpose, because the plugin owns the original file
+  and replaces it on each update. The agent may then pick the original (and
+  ignore the user's lessons), load both (and get conflicting instructions), or
+  keep a stale copy after a plugin update. Duplicate names also behave
+  differently in each agent. Candidate fixes, per agent:
+  - A. Turn off the original. Some agents can only turn off a whole plugin.
+  - B. Hide the original by giving the copy the same name, where the agent's
+    rules let the copy win.
+  - C. Patch the plugin's file in place and patch it again after each update.
+  - D. Add a notes-only companion skill. Nothing makes the agent load both.
+
+  Plan: use A where an agent supports it, else C, and prove the result with a
+  trigger test in each agent.
+- **Q2. A user's own steps on a shared skill.** D18 covers the author's short
+  version. Can a user who is not the author add a step of their own (for
+  example, a local `4.`) without forking the skill?
+- **Q3. "The same kind of task."** How does route 3 decide that three tasks are
+  the same kind, so the repeat count of D20 is meaningful?
+- **Q4. Agents with weak hooks.** Some agents cannot run a hook on each message.
   Is a scan of the session log at the end of the session good enough there?

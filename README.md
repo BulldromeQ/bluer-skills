@@ -64,6 +64,8 @@ Any agent that reads skills can use it, with or without bluer installed.
 - **Lessons are applied automatically, and each change is a new version.** You
   can turn auto-apply off for one skill or for all skills, and you can roll back
   to any version.
+- **It keeps skills short.** A gate separates real rules from one-off edge
+  cases. Rare cases wait, and they expire if they never come back.
 - **It learns all the time.** Once installed, bluer captures lessons in every
   session, sends each one to the skill it belongs to, and drafts new skills for
   work that repeats.
