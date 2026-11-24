@@ -74,15 +74,26 @@ function saveState(home: string, sessionId: string, state: SessionState): void {
   writeFileSync(file, JSON.stringify(state) + "\n");
 }
 
-/** Write the shim that runs this CLI. It is rewritten at each session start, because the plugin's path changes with each plugin update. */
-export function installShim(home: string, cliPath: string): string {
+const shellQuote = (value: string): string => `"${value.replace(/(["\\$`])/g, "\\$1")}"`;
+
+/**
+ * Write the shim that runs this CLI. It is rewritten at each session start,
+ * because the plugin's path changes with each plugin update.
+ *
+ * The shim uses `node` from PATH when there is one. Otherwise it uses the Node
+ * that ran this session start (`nodePath`): an app can start Claude Code with a
+ * PATH that does not hold Node, for example without /opt/homebrew/bin.
+ */
+export function installShim(home: string, cliPath: string, nodePath: string = process.execPath): string {
   const shim = shimPath(home);
   mkdirSync(dirname(shim), { recursive: true });
+  const cli = shellQuote(cliPath);
   const body =
     "#!/bin/sh\n" +
     "# Written by the bluer Claude Code plugin at each session start.\n" +
     "# It runs the bluer CLI that ships with the plugin.\n" +
-    `exec node "${cliPath.replace(/(["\\$`])/g, "\\$1")}" "$@"\n`;
+    `if command -v node >/dev/null 2>&1; then exec node ${cli} "$@"; fi\n` +
+    `exec ${shellQuote(nodePath)} ${cli} "$@"\n`;
   if (!existsSync(shim) || readFileSync(shim, "utf8") !== body) writeFileSync(shim, body);
   chmodSync(shim, 0o755);
   return shim;

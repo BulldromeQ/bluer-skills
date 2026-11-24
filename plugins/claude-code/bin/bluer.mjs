@@ -8171,13 +8171,16 @@ function saveState(home, sessionId, state) {
   mkdirSync4(dirname2(file), { recursive: true });
   writeFileSync3(file, JSON.stringify(state) + "\n");
 }
-function installShim(home, cliPath) {
+var shellQuote = (value) => `"${value.replace(/(["\\$`])/g, "\\$1")}"`;
+function installShim(home, cliPath, nodePath = process.execPath) {
   const shim = shimPath(home);
   mkdirSync4(dirname2(shim), { recursive: true });
+  const cli = shellQuote(cliPath);
   const body = `#!/bin/sh
 # Written by the bluer Claude Code plugin at each session start.
 # It runs the bluer CLI that ships with the plugin.
-exec node "${cliPath.replace(/(["\\$`])/g, "\\$1")}" "$@"
+if command -v node >/dev/null 2>&1; then exec node ${cli} "$@"; fi
+exec ${shellQuote(nodePath)} ${cli} "$@"
 `;
   if (!existsSync5(shim) || readFileSync3(shim, "utf8") !== body) writeFileSync3(shim, body);
   chmodSync(shim, 493);

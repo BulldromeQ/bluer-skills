@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
@@ -42,14 +43,18 @@ describe("session-start", () => {
     const { ctx } = setup();
     assert.equal(hook(ctx, "session-start", { session_id: "s1" }), "");
     const shim = shimPath(ctx.home);
-    assert.match(readFileSync(shim, "utf8"), /exec node "\/plugin\/bin\/bluer\.mjs" "\$@"/);
+    const body = readFileSync(shim, "utf8");
+    assert.match(body, /then exec node "\/plugin\/bin\/bluer\.mjs" "\$@"; fi/);
+    assert.ok(body.includes(`exec "${process.execPath}" "/plugin/bin/bluer.mjs" "$@"`), "falls back to the Node that ran the hook");
     assert.equal(statSync(shim).mode & 0o111, 0o111);
   });
 
   it("quotes a path that holds shell characters", () => {
     const { ctx } = setup();
-    installShim(ctx.home, '/odd "path"/$HOME/bluer.mjs');
-    assert.match(readFileSync(shimPath(ctx.home), "utf8"), /exec node "\/odd \\"path\\"\/\\\$HOME\/bluer\.mjs"/);
+    installShim(ctx.home, '/odd "path"/$HOME/bluer.mjs', "/n`ode");
+    const body = readFileSync(shimPath(ctx.home), "utf8");
+    assert.match(body, /exec node "\/odd \\"path\\"\/\\\$HOME\/bluer\.mjs"/);
+    assert.match(body, /exec "\/n\\`ode" /);
   });
 });
 
@@ -173,5 +178,32 @@ describe("bluer hook (CLI)", () => {
     const input = JSON.stringify({ session_id: "s1", tool_name: "Skill", tool_input: { skill: "weekly-update" } });
     run(["hook", "claude-code", "post-tool-use"], { BLUER_HOME: ctx.home, BLUER_CLI_PATH: CLI }, (l) => out.push(l), () => input);
     assert.equal(contextOf(out[0] ?? "").hookEventName, "PostToolUse");
+  });
+});
+
+describe("plugin bin/bluer", () => {
+  const script = join(import.meta.dirname, "..", "plugins", "claude-code", "bin", "bluer");
+  const bare = { PATH: "/usr/bin:/bin" };
+
+  it("finds Node when PATH has none", { skip: existsSync("/usr/bin/node") && "this machine has /usr/bin/node" }, () => {
+    const root = mkdtempSync(join(tmpdir(), "bluer-bin-"));
+    roots.push(root);
+    mkdirSync(join(root, ".volta", "bin"), { recursive: true });
+    symlinkSync(process.execPath, join(root, ".volta", "bin", "node"));
+    const r = spawnSync("/bin/sh", [script, "help"], { env: { ...bare, HOME: root }, encoding: "utf8" });
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /bluer new/);
+  });
+
+  it("exits quietly for a hook, and with a clear error otherwise, when there is no Node", { skip: existsSync("/usr/bin/node") && "this machine has /usr/bin/node" }, () => {
+    const root = mkdtempSync(join(tmpdir(), "bluer-bin-"));
+    roots.push(root);
+    const env = { ...bare, HOME: root };
+    if (existsSync("/opt/homebrew/bin/node") || existsSync("/usr/local/bin/node")) return; // a usual folder has Node; nothing to test here
+    const hook = spawnSync("/bin/sh", [script, "hook", "claude-code", "session-start"], { env, encoding: "utf8", input: "{}" });
+    assert.deepEqual([hook.status, hook.stdout, hook.stderr], [0, "", ""]);
+    const cli = spawnSync("/bin/sh", [script, "list"], { env, encoding: "utf8" });
+    assert.equal(cli.status, 1);
+    assert.match(cli.stderr, /Node\.js 20 or later is needed/);
   });
 });

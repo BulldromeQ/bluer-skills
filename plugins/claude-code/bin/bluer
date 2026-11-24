@@ -2,11 +2,45 @@
 # Runs the bluer CLI that ships with this plugin (bluer.mjs, built from src/
 # by "npm run build:plugin"). It needs Node.js 20 or later.
 #
+# An app can start Claude Code with a PATH that does not hold Node (for example
+# without /opt/homebrew/bin), so when PATH has no `node`, this script also looks
+# in the usual install folders.
+#
 # Hooks call this script too. Without Node.js, a hook exits quietly so that it
 # never blocks a Claude Code session.
-if ! command -v node >/dev/null 2>&1; then
+
+find_node() {
+  if command -v node >/dev/null 2>&1; then
+    command -v node
+    return 0
+  fi
+  for candidate in \
+    /opt/homebrew/bin/node \
+    /usr/local/bin/node \
+    "$HOME/.volta/bin/node" \
+    "$HOME/.local/share/mise/shims/node" \
+    "$HOME/.asdf/shims/node" \
+    "$HOME/.nodenv/shims/node" \
+    "$HOME/Library/Application Support/fnm/aliases/default/bin/node" \
+    "$HOME/.local/share/fnm/aliases/default/bin/node" \
+    /usr/bin/node; do
+    if [ -x "$candidate" ]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+  # nvm: the newest installed version.
+  candidate=$(ls -d "$HOME"/.nvm/versions/node/*/bin/node 2>/dev/null | tail -n 1)
+  if [ -n "$candidate" ] && [ -x "$candidate" ]; then
+    echo "$candidate"
+    return 0
+  fi
+  return 1
+}
+
+if ! NODE=$(find_node); then
   if [ "$1" = "hook" ]; then exit 0; fi
   echo "bluer: Node.js 20 or later is needed. Install it from https://nodejs.org and try again." >&2
   exit 1
 fi
-exec node "$(dirname "$0")/bluer.mjs" "$@"
+exec "$NODE" "$(dirname "$0")/bluer.mjs" "$@"
