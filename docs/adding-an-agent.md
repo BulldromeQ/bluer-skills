@@ -42,7 +42,7 @@ adapter's notes.
    CLI to build. If the agent's skill format differs from Claude Code's, generate
    its copy of the `bluer` skill from `plugins/claude-code/skills/bluer/SKILL.md`
    in `npm run build:plugin` (the removed Gemini CLI adapter did this in
-   `scripts/build-gemini-extension.ts`; see commit `d802c60`), and add it to the
+   `scripts/build-gemini-extension.ts`; see commit `5278857`), and add it to the
    CI up-to-date check.
 4. **Test the dialect** in `test/hooks.test.ts`: a skill load counts a run and
    returns the note in the agent's event name, and the agent's own bluer skill
@@ -73,7 +73,7 @@ adapter's notes.
 
 ## Notes from the Gemini CLI adapter
 
-bluer had a Gemini CLI adapter until commit `d802c60` (see `src/agents/gemini-cli.ts`
+bluer had a Gemini CLI adapter until commit `5278857` (see `src/agents/gemini-cli.ts`
 and the root `gemini-extension.json` there). Google moved Gemini CLI users to
 Antigravity CLI, which keeps skills, hooks and extensions, so these notes may
 help an Antigravity adapter:

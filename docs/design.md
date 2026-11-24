@@ -412,7 +412,7 @@ Findings from the Claude Code adapter:
   rule. That is right: the gate is for situational corrections and edge cases,
   not for rules the user states. `--always` means "a standing rule".
 
-A Gemini CLI adapter shipped until commit `d802c60`, and was removed (D32). Its
+A Gemini CLI adapter shipped until commit `5278857`, and was removed (D32). Its
 findings are in [adding-an-agent.md](adding-an-agent.md), for whoever adds
 Google Antigravity.
 
