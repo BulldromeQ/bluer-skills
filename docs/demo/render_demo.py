@@ -78,7 +78,7 @@ class Message:
     role: str  # "you", "agent" or "divider"
     text: str
     shown: int | None = None  # characters typed so far; None means all
-    emphasis: str = ""  # lines that contain this text are drawn in green
+    emphasis: str = ""  # paragraphs that contain this text are drawn in green
 
 
 @dataclass
@@ -131,9 +131,12 @@ def render_chat(d: ImageDraw.ImageDraw, state: State) -> None:
             continue
         text = m.text if m.shown is None else m.text[: m.shown]
         cursor = m.shown is not None and m.shown < len(m.text)
-        lines = wrap(text + ("▌" if cursor else ""), width_chars)
-        for i, line in enumerate(lines):
-            rows.append((m.role if i == 0 else "", line, bool(m.emphasis) and m.emphasis in line))
+        first = True
+        for para in (text + ("▌" if cursor else "")).split("\n"):
+            emphasized = bool(m.emphasis) and m.emphasis in para  # the whole paragraph, across wrapped rows
+            for line in wrap(para, width_chars):
+                rows.append((m.role if first else "", line, emphasized))
+                first = False
         rows.append(("", "", False))
     if state.thinking:
         rows.append(("agent", "…", True))
@@ -274,12 +277,16 @@ def story() -> Movie:
     m.hold(2600)
 
     # 2. Use it, and correct it once.
-    s.caption = "2 · Use it. Correct it once."
+    s.caption = "2 · Correct it once. You see what it learned."
     m.type("/weekly-update-email shipped search, fixed three bugs, onboarded Ana")
     m.reply("Draft (not sent):\nHi team, here is my update for this week. This week was a busy one. First, I shipped the new search page, which took most of the week. Second, I fixed three bugs...")
     m.hold(1600)
     m.type("Too long. Keep it under 150 words, and always CC my manager Sam.")
-    m.reply("Done, and I saved two rules for this skill: keep it under 150 words, and always CC Sam.")
+    m.reply(
+        'weekly-update-email learned: "keep it under 150 words". It does this every time now. Say "undo that" to remove it.\n\n'
+        'weekly-update-email learned: "always CC my manager Sam". It does this every time now. Say "undo that" to remove it.',
+        emphasis="learned",
+    )
     rules = {1: ["Keep it under 150 words"], 2: ["Always CC my manager Sam"]}
     s.skill = skill_lines(STEPS, rules, new_rules={"Keep it under 150 words", "Always CC my manager Sam"})
     s.version = 3

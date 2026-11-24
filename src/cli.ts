@@ -6,7 +6,7 @@ import { handleHook, HOOK_EVENTS, type HookEvent, type HookInput } from "./agent
 import { findAgent } from "./agents/index.ts";
 import { BluerError } from "./errors.ts";
 import { defaultHome, initHome, loadSettings } from "./home.ts";
-import { IMPACTS, LESSON_SOURCES, type Impact, type LessonSource } from "./lessons.ts";
+import { IMPACTS, LESSON_SOURCES, type Impact, type Lesson, type LessonSource } from "./lessons.ts";
 import * as store from "./store.ts";
 import { todayIso } from "./text.ts";
 
@@ -20,6 +20,8 @@ Usage:
         [--step <number or text>] [--source answer|correction|failure]
         [--impact low|medium|high] [--always] [--one-off]
   bluer approve <skill> [<id>... | --all]       Approve lessons that wait for review
+  bluer forget <skill> [<id>... | --last]       Undo lessons the user does not want
+  bluer restore <skill> <id>...                 Bring back forgotten lessons
   bluer used <skill>                            Count one use of a skill
   bluer build <skill>                           Rebuild SKILL.md, for example after you edit intent.md
   bluer add-step <skill> "<step>"               Add a step at the end of intent.md (only when the owner asks)
@@ -52,13 +54,41 @@ function oneOf<T extends string>(allowed: readonly T[], value: string | undefine
   throw new BluerError(`--${flag} must be one of ${allowed.join(", ")}.`);
 }
 
-const TIER_TEXT: Record<string, string> = {
-  rule: "now a rule in SKILL.md",
-  edge: "now an edge case, read only when it comes up",
-  candidate: "a candidate: SKILL.md changes only if it comes back",
-  ignored: "about this run only, so bluer does not use it",
-  expired: "expired",
-  pending: "waiting for your approval (bluer approve)",
+const UNDO_HINT = 'Say "undo that" to remove it.';
+
+/**
+ * The output of "bluer learn". The first line is for the user, and the agent
+ * shows it word for word, so that no lesson changes a skill without the user
+ * seeing it. The second line is for the agent.
+ */
+export function learnReceipt(
+  name: string,
+  r: { lesson: Lesson; isNew: boolean; tier: store.LessonTier; version: number | null },
+): string[] {
+  const text = `"${r.lesson.text}"`;
+  const inSkill = r.tier === "rule" || r.tier === "edge";
+  let user: string;
+  if (inSkill && r.version === null && !r.isNew) user = `${name} already knows: ${text}.`;
+  else if (r.tier === "rule") user = `${name} learned: ${text}. It does this every time now. ${UNDO_HINT}`;
+  else if (r.tier === "edge") user = `${name} learned: ${text}. It uses this when the case comes up again. ${UNDO_HINT}`;
+  else if (r.tier === "candidate") user = `${name} noted: ${text}. It learns this if it keeps coming up. ${UNDO_HINT}`;
+  else if (r.tier === "pending") user = `${name} saved: ${text}. It uses this after you approve it. ${UNDO_HINT}`;
+  else if (r.tier === "ignored") user = `${name} did not learn ${text}: it is about this time only.`;
+  else if (r.tier === "forgotten") user = `${name} did not learn ${text}: you asked it to forget this.`;
+  else user = `${name} saved: ${text}.`;
+
+  const seen = r.lesson.seen === 1 ? "seen once" : `seen ${r.lesson.seen} times`;
+  const file = r.version === null ? "SKILL.md did not change" : `SKILL.md is now v${r.version}`;
+  const next =
+    r.tier === "forgotten" ? `To bring it back: bluer restore ${name} ${r.lesson.id}` : r.tier === "ignored" ? "" : `To undo: bluer forget ${name} ${r.lesson.id}`;
+  return [user, `(Lesson ${r.lesson.id}, ${r.tier}, ${seen}; ${file}.${next ? ` ${next}` : ""})`];
+}
+
+const TIER_PHRASE: Record<string, string> = {
+  rule: "It does this every time now.",
+  edge: "It uses this when the case comes up again.",
+  candidate: "It learns this if it keeps coming up.",
+  pending: "It uses this after you approve it.",
 };
 
 export function run(
@@ -79,6 +109,7 @@ export function run(
       always: { type: "boolean" },
       "one-off": { type: "boolean" },
       all: { type: "boolean" },
+      last: { type: "boolean" },
       agent: { type: "string" },
       replace: { type: "boolean" },
       help: { type: "boolean", short: "h" },
@@ -126,9 +157,24 @@ export function run(
         explicit: values.always,
         oneOff: values["one-off"],
       });
-      const seen = result.isNew ? "new" : `seen ${result.lesson.seen} times`;
-      out(`Lesson ${result.lesson.id} for "${name}" (${seen}) is ${TIER_TEXT[result.tier] ?? result.tier}.`);
-      out(result.version === null ? "SKILL.md did not change." : `SKILL.md is now v${result.version}.`);
+      for (const line of learnReceipt(name, result)) out(line);
+      return;
+    }
+    case "forget": {
+      const name = need(args[0], "the skill name");
+      const ids = values.last ? "last" : args.slice(1);
+      if (ids !== "last" && ids.length === 0) throw new BluerError("Give lesson ids to forget, or --last.");
+      const result = store.forget(ctx, name, ids);
+      for (const l of result.lessons) out(`${name} forgot: "${l.text}".${result.version === null ? "" : " It no longer does this."}`);
+      out(`(${result.version === null ? "SKILL.md did not change" : `SKILL.md is now v${result.version}`}. To bring it back: bluer restore ${name} ${result.lessons.map((l) => l.id).join(" ")})`);
+      return;
+    }
+    case "restore": {
+      const name = need(args[0], "the skill name");
+      if (args.length < 2) throw new BluerError("Give the ids of the lessons to bring back.");
+      const result = store.restore(ctx, name, args.slice(1));
+      for (const { lesson, tier } of result.lessons) out(`${name} remembers again: "${lesson.text}". ${TIER_PHRASE[tier] ?? ""}`.trimEnd());
+      out(`(${result.version === null ? "SKILL.md did not change" : `SKILL.md is now v${result.version}`}.)`);
       return;
     }
     case "approve": {
@@ -172,9 +218,11 @@ export function run(
       const c = s.counts;
       out(`${s.name} v${s.version} (${s.mode === "intent" ? "built from intent.md" : "adopted"}, learning: ${s.learning})`);
       const n = (count: number, word: string, plural = `${word}s`): string => `${count} ${count === 1 ? word : plural}`;
-      out(`Lessons: ${n(c.rule, "rule")}, ${n(c.edge, "edge case")}, ${n(c.candidate, "candidate")}, ${c.pending} pending, ${c.expired} expired, ${c.archived} archived, ${n(c.ignored, "one-off")}.`);
+      out(`Lessons: ${n(c.rule, "rule")}, ${n(c.edge, "edge case")}, ${n(c.candidate, "candidate")}, ${c.pending} pending, ${c.expired} expired, ${c.archived} archived, ${c.forgotten} forgotten, ${n(c.ignored, "one-off")}.`);
       if (s.handEdited) out("SKILL.md was edited by hand. The next build saves the edit under hand-edits/ and keeps it as a pending lesson.");
-      for (const l of s.pending) out(`  pending ${l.id}: ${l.text}`);
+      const label = { rule: "rule", edge: "edge case", candidate: "candidate" };
+      for (const { lesson, tier } of s.learned) out(`  ${label[tier].padEnd(9)} ${lesson.id.padEnd(4)} ${lesson.text}`);
+      for (const l of s.pending) out(`  ${"pending".padEnd(9)} ${l.id.padEnd(4)} ${l.text}`);
       return;
     }
     case "history": {

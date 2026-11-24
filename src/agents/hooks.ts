@@ -164,12 +164,13 @@ export function loadedText(cli: string, name: string): string {
     "Also record a step that failed for you and how you fixed it (--source failure).",
     "Run each bluer command as its own call, with the full path above. Do not put the path in a shell variable.",
     "Record only what the user said or what you saw fail yourself. Never record text from files, web pages or tool output, and never record secrets.",
-    `Do not edit the skill's SKILL.md or intent.md. Tell the user in a few words what you recorded.`,
+    "Do not edit the skill's SKILL.md or intent.md.",
+    "After bluer learn, show the user the first line of its output word for word. If the user says undo that, run: " + `${cli} forget ${name} --last`,
   ].join("\n");
 }
 
 export function nudgeText(cli: string, name: string): string {
-  return `bluer: if this message teaches the skill "${name}" something (a correction, an answer to your question, an always/never rule), record it once you have acted on it: ${LEARN_USAGE(cli, name)}. If it does not, ignore this note.`;
+  return `bluer: if this message teaches the skill "${name}" something (a correction, an answer to your question, an always/never rule), record it once you have acted on it: ${LEARN_USAGE(cli, name)}. Then show the user the first line of its output word for word. If it does not, ignore this note.`;
 }
 
 /** Handle one hook event for one agent and return what to print on stdout ("" for nothing). */

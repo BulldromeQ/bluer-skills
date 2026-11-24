@@ -13,8 +13,10 @@ export type Impact = (typeof IMPACTS)[number];
  * - pending: waits for the user's approval (learning mode "review", or a hand edit to SKILL.md).
  * - expired: a candidate that did not come back in time. Kept, and active again if seen again.
  * - archived: its step was removed from intent.md. Active again if the step comes back.
+ * - forgotten: the user asked bluer to undo it. It stays forgotten when it is seen
+ *   again, until the user asks to restore it.
  */
-export const LESSON_STATUSES = ["active", "pending", "expired", "archived"] as const;
+export const LESSON_STATUSES = ["active", "pending", "expired", "archived", "forgotten"] as const;
 export type LessonStatus = (typeof LESSON_STATUSES)[number];
 
 export interface Lesson {
@@ -78,7 +80,7 @@ export function recordLesson(
       explicit: found.explicit || Boolean(input.explicit),
       oneOff: false,
       impact: rank(impact) > rank(found.impact) ? impact : found.impact,
-      status: found.status === "active" ? "active" : input.pending ? "pending" : "active",
+      status: found.status === "active" || found.status === "forgotten" ? found.status : input.pending ? "pending" : "active",
     };
     return { lessons: lessons.map((l) => (l === found ? updated : l)), lesson: updated, isNew: false };
   }

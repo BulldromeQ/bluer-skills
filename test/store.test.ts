@@ -112,6 +112,54 @@ describe("learn", () => {
   });
 });
 
+describe("forget and restore", () => {
+  it("forgets the last lesson, keeps it forgotten when seen again, and restores it", () => {
+    const ctx = setup();
+    const { name } = store.createSkill(ctx, HOUSE, { link: false });
+    store.learn(ctx, name, { text: "Never use bleach", explicit: true });
+    store.learn(ctx, name, { text: "Open the window first", step: "2", explicit: true });
+    assert.match(skillFile(ctx, name, "SKILL.md"), /Open the window first/);
+
+    const forgot = store.forget(ctx, name, "last");
+    assert.deepEqual([forgot.lessons.map((l) => l.id), forgot.version], [["L2"], 4]);
+    assert.doesNotMatch(skillFile(ctx, name, "SKILL.md"), /Open the window first/);
+    assert.match(skillFile(ctx, name, "SKILL.md"), /Never use bleach/);
+    assert.match(skillFile(ctx, name, "CHANGELOG.md"), /- v4 \(2026-11-24\): forgot L2: Open the window first/);
+
+    const again = store.learn(ctx, name, { text: "Open the window first", step: "2", explicit: true });
+    assert.deepEqual([again.tier, again.version, again.lesson.seen], ["forgotten", null, 2]);
+    assert.doesNotMatch(skillFile(ctx, name, "SKILL.md"), /Open the window first/);
+    assert.equal(store.status(ctx, name).counts.forgotten, 1);
+
+    const restored = store.restore(ctx, name, ["l2"]);
+    assert.deepEqual([restored.lessons[0]?.tier, restored.version], ["rule", 5]);
+    assert.match(skillFile(ctx, name, "SKILL.md"), /Open the window first/);
+    assert.equal(git(ctx.home, ["status", "--porcelain"]), "");
+  });
+
+  it("refuses unknown, already forgotten and not forgotten lessons", () => {
+    const ctx = setup();
+    const { name } = store.createSkill(ctx, HOUSE, { link: false });
+    assert.throws(() => store.forget(ctx, name, "last"), /no lesson recorded yet/);
+    store.learn(ctx, name, { text: "Never use bleach", explicit: true });
+    assert.throws(() => store.forget(ctx, name, ["L9"]), /has no lesson L9/);
+    assert.throws(() => store.restore(ctx, name, ["L1"]), /is not forgotten/);
+    store.forget(ctx, name, ["L1"]);
+    assert.throws(() => store.forget(ctx, name, ["L1"]), /is already forgotten/);
+  });
+
+  it("lists what the skill has learned in status", () => {
+    const ctx = setup();
+    const { name } = store.createSkill(ctx, HOUSE, { link: false });
+    store.learn(ctx, name, { text: "Never use bleach", explicit: true });
+    store.learn(ctx, name, { text: "Mind the cat", impact: "medium" });
+    store.learn(ctx, name, { text: "Maybe start upstairs" });
+    store.learn(ctx, name, { text: "Guests today", oneOff: true });
+    const learned = store.status(ctx, name).learned.map(({ lesson, tier }) => `${tier} ${lesson.id}`);
+    assert.deepEqual(learned, ["rule L1", "edge L2", "candidate L3"]);
+  });
+});
+
 describe("intent changes, hand edits and rollback", () => {
   it("keeps learned rules when the owner adds a step", () => {
     const ctx = setup();

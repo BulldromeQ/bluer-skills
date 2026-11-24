@@ -43,6 +43,7 @@ export function buildSkill(input: BuildInput): BuildResult {
   const tiers: Record<Tier, Lesson[]> = { rule: [], edge: [], candidate: [], ignored: [], expired: [] };
   const lessons = input.lessons.map((original) => {
     let lesson = original;
+    if (lesson.status === "forgotten") return lesson;
     if (intent && lesson.step !== null) {
       const stepExists = stepIndex.has(normalizeKey(lesson.step));
       if (!stepExists) return lesson.status === "archived" ? lesson : { ...lesson, status: "archived" as const };

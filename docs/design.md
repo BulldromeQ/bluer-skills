@@ -144,6 +144,11 @@ A lesson belongs to a step by the step's text, not its number. Adding or
 reordering steps does not move lessons to the wrong step. When a step is removed,
 its lessons are archived; when the step comes back, so do they.
 
+When the user undoes a lesson (`bluer forget`), it is marked forgotten, not
+deleted. If an agent records the same lesson again, it stays forgotten: the user
+said no once, and an agent must not override that. `bluer restore` brings it
+back.
+
 ### Built `SKILL.md`
 
 - Frontmatter: `name`, `description` and `metadata` (`built-by`, `version`),
@@ -278,6 +283,13 @@ and report unused skills and conflicting lessons.
   from the user wins, and bluer records the conflict.
 - **Test gate.** An automatic version must pass the skill's trigger test and
   negative test, or bluer keeps the previous version.
+- **A receipt for every lesson.** `bluer learn` prints one line for the user:
+  what the skill learned, its tier, and "Say "undo that" to remove it". The
+  agent shows that line word for word. No lesson changes a skill without the
+  user seeing it.
+- **Undo in one sentence.** "Undo that" makes the agent run
+  `bluer forget <skill> --last`. bluer stores the id of the last lesson it
+  recorded, so the agent does not have to guess which one.
 - **Visible history.** Every change is a version with a `CHANGELOG.md` line.
 
 ### Trigger tests
@@ -428,11 +440,12 @@ Check each agent's current hook and skill support when its adapter is built.
 
 | Part | Status |
 |---|---|
-| CLI: `new`, `learn`, `approve`, `used`, `build`, `list`, `status`, `history`, `rollback`, `adopt`, `link`, `init` | Built |
+| CLI: `new`, `learn`, `forget`, `restore`, `approve`, `used`, `build`, `list`, `status`, `history`, `rollback`, `adopt`, `link`, `init` | Built |
 | Intent parsing (one line or one step per line, Chinese punctuation) | Built |
 | Learning gate with levels, candidate expiry by days and runs | Built |
 | Build in intent mode and base mode; edge-case file | Built |
 | Lessons follow steps by text; archive and restore with the step | Built |
+| Lesson receipts, `bluer forget` (`--last`) and `bluer restore`; `status` lists each lesson | Built; tested live in Claude Code and Gemini CLI |
 | Hand-edit detection and saving | Built |
 | Git versions, history, rollback that keeps `intent.md` | Built |
 | Link into each installed agent's skills folder; never overwrite without `--replace` | Built |
@@ -482,6 +495,7 @@ IDs are stable: other documents and commits refer to them.
 | D25 | Agents without per-message hooks scan the session log at session end. | Good enough for a first adapter; better than no capture. |
 | D26 | bluer's own creator writes lessons (source `creator`); an external creator's `SKILL.md` becomes a base. | A rebuild must never wipe the creator's work, and the built-in path keeps one model for everything learned. |
 | D27 | The description lives in `bluer.json`, written by an agent and improved by missed triggers. | It decides triggering, so it must survive rebuilds and improve with use. |
+| D28 | Each lesson gets a one-line receipt that the agent shows word for word; "undo that" forgets the last lesson, and a forgotten lesson stays forgotten. | Users fear "the agent changed my skill". Seeing every change, and undoing it in one sentence, builds more trust than history and rollback alone. |
 
 ## 12. Open questions
 

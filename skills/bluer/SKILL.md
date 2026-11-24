@@ -1,6 +1,6 @@
 ---
 name: bluer
-description: 'Create and manage self-improving skills with bluer. The user writes a skill as a few plain steps; bluer builds the detailed skill and records what the agent learns while it uses it. Use when the user wants to turn steps into a skill, add a step to a skill, teach a skill something, see what a skill has learned, undo what it learned, change how it learns, or bring an existing skill into bluer. Use it for requests such as: "make a skill for my weekly update", "turn these steps into a skill", "create a skill that does X, 1. ... 2. ...", "add a step to my skill", "remember this for my skill", "what has my skill learned", "undo that lesson", "roll back my skill", "stop my skill from learning", "adopt this skill into bluer", "bluer".'
+description: 'Create and manage self-improving skills with bluer. The user writes a skill as a few plain steps; bluer builds the detailed skill and records what the agent learns while it uses it. Use when the user wants to turn steps into a skill, add a step to a skill, teach a skill something, see what a skill has learned, undo what it learned, change how it learns, or bring an existing skill into bluer. Use it for requests such as: "make a skill for my weekly update", "turn these steps into a skill", "create a skill that does X, 1. ... 2. ...", "add a step to my skill", "remember this for my skill", "what has my skill learned", "undo that", "forget that lesson", "roll back my skill", "stop my skill from learning", "adopt this skill into bluer", "bluer".'
 ---
 
 <!-- Generated from plugins/claude-code/skills/bluer/SKILL.md by scripts/build-gemini-extension.ts. Edit that file, then run npm run build:plugin. -->
@@ -33,7 +33,10 @@ later from https://nodejs.org, then try again.
 - Keep each lesson short, one idea, close to the user's words.
 - Run each bluer command as its own call, with the full path. Do not put the
   path in a shell variable: permission checks can refuse such commands.
-- After each bluer command, tell the user in one plain sentence what changed.
+- After `bluer learn`, `bluer forget` or `bluer restore`, show the user the
+  first line of the output word for word, on its own line. Never skip it: the
+  user must see every change to a skill. Keep the line in brackets to yourself.
+- After other bluer commands, tell the user in one plain sentence what changed.
   Do not show lesson ids or version numbers unless they ask.
 
 ## Create a skill
@@ -80,6 +83,15 @@ Leave `--always` off for a correction that depends on this situation ("move
 the bug fixes to the end"). Record it again each time it happens: bluer counts
 the repeats, and repeats are how such a lesson becomes a rule.
 
+## Undo a lesson
+
+When the user says "undo that", "forget that" or "don't learn that" about a
+lesson bluer just recorded, run `bluer forget <skill> --last`. For an older
+lesson, run `bluer status <skill>`, find its id, and run
+`bluer forget <skill> <id>`. A forgotten lesson stays forgotten, even if you
+record it again. To bring it back when the user asks, run
+`bluer restore <skill> <id>`.
+
 ## Change the steps
 
 - To add a step: `bluer add-step <skill> "<step>"`.
@@ -89,10 +101,11 @@ the repeats, and repeats are how such a lesson becomes a rule.
 ## Show and undo
 
 - `bluer list`: the user's skills.
-- `bluer status <skill>`: the version, and how many lessons are rules, edge
-  cases and candidates. It also lists lessons that wait for approval.
+- `bluer status <skill>`: the version, and each lesson the skill has learned
+  (rules, edge cases, candidates and lessons that wait for approval), with its
+  id. Use it to answer "what has my skill learned".
 - `bluer history <skill>`: one line per version.
-- `bluer rollback <skill> <version>`: undo what was learned after that version.
+- `bluer rollback <skill> <version>`: undo everything learned after that version.
   It never changes the owner's steps. Show the history and agree on the version
   with the user first.
 - `bluer approve <skill> --all` (or lesson ids): approve waiting lessons, after

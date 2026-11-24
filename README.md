@@ -16,6 +16,16 @@ questions, gets corrected, makes mistakes. bluer turns each of those into a
 lesson and folds the good ones back into the skill. Your own short version stays
 short, in your words. The skill your agent reads grows the detail.
 
+**You see every change, and one sentence undoes it.** Each time a skill learns
+something, your agent tells you in one line:
+
+```text
+weekly-update learned: "keep it under 150 words". It does this every time now. Say "undo that" to remove it.
+```
+
+bluer never changes your own steps, and every change is a version you can roll
+back.
+
 > **Status: early.** The Claude Code plugin and the Gemini CLI extension work:
 > create skills in chat, and your agent records what it learns while it uses
 > them. Other agents and the npm package come later. See the [roadmap](#roadmap).
@@ -92,6 +102,9 @@ bluer saves this as `intent.md`. It is yours, and it stays this short.
 | You said "maybe use bullet points", once | **Candidate**: it waits to see if you say it again |
 | You said "this week, leave out the offsite planning" | **One-off**: not used next week |
 
+Each time, your agent shows you the one-line receipt. If a lesson is wrong, say
+"undo that" and it is gone.
+
 **3. bluer builds the skill your agent reads.** This is the `SKILL.md` it wrote
 (shown without its frontmatter):
 
@@ -136,6 +149,26 @@ flowchart LR
     G -- "one-offs" --> X["not used"]
 ```
 
+## You stay in control
+
+- **You see every lesson.** Your agent shows a one-line receipt for each one:
+  what the skill learned, and whether it is a rule, an edge case or only noted.
+- **One sentence undoes a lesson.** Say "undo that", and the lesson is gone. It
+  stays gone, even if the same thing comes up again, until you ask for it back.
+- **Your words are never changed for you.** bluer never edits your version on
+  its own. *(Planned:)* if the skill drifts away from what you wrote, bluer
+  shows you why and proposes a new line, and changes it only when you say yes.
+- **Every change is a version.** `bluer history` shows them; `bluer rollback`
+  undoes everything learned after a version. Rollback never touches your own
+  steps.
+- **Learning is automatic, and you can slow it down.** Set a skill, or all
+  skills, to `review` (you approve each lesson) or `off`.
+- **Hand edits are not lost.** If you edit the built `SKILL.md`, bluer saves a
+  copy and keeps it as a lesson to review, instead of overwriting it.
+- **Local and private.** No telemetry, no account and no API key. Your agent does
+  the thinking; bluer handles files and versions.
+
+
 ## The learning gate
 
 Not everything an agent learns belongs in a skill. bluer gives each lesson a
@@ -149,20 +182,6 @@ tier:
 | **Ignored** | Not used | It was about this one run only |
 
 You can make the gate `strict` or `eager`. The default is `balanced`.
-
-## You stay in control
-
-- **Your words are never changed for you.** bluer never edits your version on
-  its own. *(Planned:)* if the skill drifts away from what you wrote, bluer
-  shows you why and proposes a new line, and changes it only when you say yes.
-- **Every change is a version.** `bluer history` shows them; `bluer rollback`
-  undoes what was learned. Rollback never touches your own steps.
-- **Learning is automatic, and you can slow it down.** Set a skill, or all
-  skills, to `review` (you approve each lesson) or `off`.
-- **Hand edits are not lost.** If you edit the built `SKILL.md`, bluer saves a
-  copy and keeps it as a lesson to review, instead of overwriting it.
-- **Local and private.** No telemetry, no account and no API key. Your agent does
-  the thinking; bluer handles files and versions.
 
 ## Works with what you have
 
@@ -197,6 +216,7 @@ export BLUER_HOME=/tmp/bluer-try      # optional: try it without touching ~/.blu
 bluer new "Weekly update, 1. read my calendar and notes from this week, 2. write a short summary, 3. email it to my team"
 bluer learn weekly-update "Keep it under 150 words" --step 2
 bluer learn weekly-update "Always CC my manager" --step 3 --always
+bluer forget weekly-update --last
 bluer status weekly-update
 bluer history weekly-update
 ```
@@ -210,8 +230,9 @@ agent can use it at once. Add `--no-link` to skip that.
 | `bluer new "<title>, 1. <step>, 2. <step>"` | Create a skill from plain steps |
 | `bluer learn <skill> "<lesson>"` | Teach a skill something (`--step`, `--always`, `--impact`, `--one-off`) |
 | `bluer build <skill>` | Rebuild after you edit `intent.md` |
-| `bluer status <skill>` | Version, lessons by tier, hand edits |
+| `bluer status <skill>` | Version, and each lesson the skill has learned |
 | `bluer history <skill>` / `bluer rollback <skill> <version>` | See and undo versions |
+| `bluer forget <skill> --last` / `bluer restore <skill> <id>` | Undo a lesson, or bring it back |
 | `bluer approve <skill> --all` | Approve lessons that wait for review |
 | `bluer adopt <folder>` | Bring an existing skill into bluer |
 | `bluer link <skill> --replace` | Swap an agent's copy of a skill for the bluer one |
@@ -223,8 +244,9 @@ Run `bluer help` for every option.
 **Do I need to know how to write a skill?** No. Write steps the way you would
 tell a person. bluer and your agent do the rest.
 
-**What if it learns something wrong?** Roll back with one command, or set the
-skill to `review` so that you approve each lesson first.
+**What if it learns something wrong?** Say "undo that". To go further back, ask
+your agent to roll the skill back to an earlier version. To approve each lesson
+before it is used, set the skill to `review`.
 
 **Will it ask me to approve commands?** Your agent asks before it runs the
 `bluer` command the first time. In Claude Code, choose "don't ask again" for

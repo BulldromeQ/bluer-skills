@@ -20,7 +20,8 @@ Requires Node.js 20 or later.
   notes, 2. write a short summary, 3. email it to my team."*
 - Or use the commands: `/bluer:new`, `/bluer:teach`, `/bluer:status`.
 - Then use your skill as usual (`/weekly-update-email`, or just ask). When you
-  correct Claude or answer its question, it records the lesson and tells you.
+  correct Claude or answer its question, it records the lesson and shows you a
+  one-line receipt. Say "undo that" to remove the lesson.
 
 ## What the plugin contains
 

@@ -36,6 +36,8 @@ export interface SkillMeta {
   learning?: LearningMode;
   /** The description an agent wrote; it decides when agents load the skill (design D27). */
   description?: string;
+  /** The id of the lesson recorded last, so that "undo that" can find it. */
+  lastLesson?: string;
 }
 
 interface Skill {
@@ -242,7 +244,7 @@ export function learn(
   ctx: Context,
   name: string,
   input: LearnInput,
-): { lesson: Lesson; isNew: boolean; tier: Tier | "pending"; version: number | null } {
+): { lesson: Lesson; isNew: boolean; tier: LessonTier; version: number | null } {
   const skill = loadSkill(ctx, name);
   const mode = skill.meta.learning ?? ctx.settings.learning;
   if (mode === "off") throw new BluerError(`Learning is off for "${name}".`);
@@ -250,11 +252,57 @@ export function learn(
   const step = resolveStep(skill, input.step);
   const recorded = recordLesson(skill.lessons, { ...input, step, pending: mode === "review" }, ctx.today, skill.meta.runs);
   skill.lessons = recorded.lessons;
+  skill.meta = { ...skill.meta, lastLesson: recorded.lesson.id };
   const verb = recorded.isNew ? "learned" : "saw again";
   const { version } = save(ctx, skill, `${verb} ${recorded.lesson.id}: ${recorded.lesson.text}`);
   const lesson = skill.lessons.find((l) => l.id === recorded.lesson.id) ?? recorded.lesson;
-  const tier = lesson.status === "pending" ? "pending" : classify(lesson, ctx.settings.gate, ctx.today, skill.meta.runs);
-  return { lesson, isNew: recorded.isNew, tier, version };
+  return { lesson, isNew: recorded.isNew, tier: tierOf(ctx, skill, lesson), version };
+}
+
+/** Where a lesson is now: a gate tier, or a status that keeps it out of the gate. */
+export type LessonTier = Tier | "pending" | "archived" | "forgotten";
+
+function tierOf(ctx: Context, skill: Skill, lesson: Lesson): LessonTier {
+  if (lesson.status === "pending" || lesson.status === "archived" || lesson.status === "forgotten") return lesson.status;
+  if (lesson.status === "expired") return "expired";
+  return classify(lesson, ctx.settings.gate, ctx.today, skill.meta.runs);
+}
+
+function pickLessons(skill: Skill, ids: string[] | "last", want: (l: Lesson) => boolean, what: string): Lesson[] {
+  const wanted = ids === "last" ? (skill.meta.lastLesson ? [skill.meta.lastLesson] : []) : ids;
+  if (wanted.length === 0) throw new BluerError(`"${skill.name}" has no lesson recorded yet.`);
+  return wanted.map((id) => {
+    const lesson = skill.lessons.find((l) => l.id === id.toUpperCase());
+    if (!lesson) throw new BluerError(`"${skill.name}" has no lesson ${id}. Run "bluer status ${skill.name}" to see its lessons.`);
+    if (!want(lesson)) throw new BluerError(`Lesson ${lesson.id} of "${skill.name}" is ${what}.`);
+    return lesson;
+  });
+}
+
+/**
+ * Undo lessons the user does not want: the last one recorded, or the ones with
+ * these ids. A forgotten lesson stays in learnings.md, so it does not come back
+ * when an agent records it again; restore() brings it back.
+ */
+export function forget(ctx: Context, name: string, ids: string[] | "last"): { lessons: Lesson[]; version: number | null } {
+  const skill = loadSkill(ctx, name);
+  const picked = pickLessons(skill, ids, (l) => l.status !== "forgotten", "already forgotten");
+  const pickedIds = new Set(picked.map((l) => l.id));
+  skill.lessons = skill.lessons.map((l) => (pickedIds.has(l.id) ? { ...l, status: "forgotten" as const } : l));
+  const summary = `forgot ${picked.map((l) => `${l.id}: ${l.text}`).join("; ")}`;
+  const { version } = save(ctx, skill, summary);
+  return { lessons: picked, version };
+}
+
+/** Bring back forgotten lessons. They go through the learning gate again. */
+export function restore(ctx: Context, name: string, ids: string[]): { lessons: { lesson: Lesson; tier: LessonTier }[]; version: number | null } {
+  const skill = loadSkill(ctx, name);
+  const picked = pickLessons(skill, ids, (l) => l.status === "forgotten", "not forgotten");
+  const pickedIds = new Set(picked.map((l) => l.id));
+  skill.lessons = skill.lessons.map((l) => (pickedIds.has(l.id) ? { ...l, status: "active" as const } : l));
+  const { version } = save(ctx, skill, `restored ${picked.map((l) => `${l.id}: ${l.text}`).join("; ")}`);
+  const lessons = skill.lessons.filter((l) => pickedIds.has(l.id)).map((lesson) => ({ lesson, tier: tierOf(ctx, skill, lesson) }));
+  return { lessons, version };
 }
 
 function resolveStep(skill: Skill, step: string | undefined): string | null {
@@ -383,8 +431,10 @@ export interface SkillStatus {
   version: number;
   learning: LearningMode;
   handEdited: boolean;
-  counts: Record<Tier | "pending" | "archived", number>;
+  counts: Record<Tier | "pending" | "archived" | "forgotten", number>;
   pending: Lesson[];
+  /** Lessons the skill uses or may use soon (rules, edge cases, candidates), with their tiers. */
+  learned: { lesson: Lesson; tier: "rule" | "edge" | "candidate" }[];
 }
 
 export function status(ctx: Context, name: string): SkillStatus {
@@ -406,8 +456,10 @@ export function status(ctx: Context, name: string): SkillStatus {
       expired: count("expired"),
       pending: count("pending"),
       archived: count("archived"),
+      forgotten: count("forgotten"),
     },
     pending: result.lessons.filter((l) => l.status === "pending"),
+    learned: (["rule", "edge", "candidate"] as const).flatMap((tier) => result.tiers[tier].map((lesson) => ({ lesson, tier }))),
   };
 }
 
