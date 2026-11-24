@@ -51,25 +51,41 @@ design.
 
 ## Skill folder
 
+The bluer home is `~/.bluer` (or `$BLUER_HOME`). It is a git repo:
+
 ```text
-~/.bluer/skills/<skill-name>/
+~/.bluer/
+  settings.json     # global settings and levels
+  skills/<name>/    # one folder per skill, linked into each agent's skill folder
+  backups/          # agent skill folders that "bluer link --replace" moved aside (not in git)
+```
+
+Each skill folder:
+
+```text
+<name>/
   intent.md       # the plain steps; never changed automatically
   SKILL.md        # built from the layers below; agents read this file
   references/
-    edge-cases.md # built; rare cases, loaded only when they come up
-  learnings.md    # this user's lessons (rules, edge cases, candidates)
-  upstream/       # only for a skill from someone else (read-only)
+    learned-edge-cases.md  # built; rare cases, read only when they come up
+  learnings.md    # this user's lessons, one block each, with tier inputs and status
+  upstream/       # only for a skill from someone else (read-only; not built yet)
     intent.md
     learnings.md
+  base/SKILL.md   # only for an adopted skill: the original, unchanged
+  hand-edits/     # copies of SKILL.md that someone edited by hand
   CHANGELOG.md    # one line per version
-  bluer.json      # settings, for example:
-                  # { "learning": "auto", "source": "local" }
-                  # { "learning": "auto", "source": "git:https://..." }
-                  # { "learning": "auto", "source": "plugin:<name>" }
+  bluer.json      # mode, source, version, run count, hash of the last built SKILL.md
 ```
 
 `SKILL.md` is built in this order, later layers winning on conflict:
-`intent.md` → `upstream/learnings.md` → `learnings.md`.
+`intent.md` (or `base/SKILL.md`) → `upstream/learnings.md` → `learnings.md`.
+
+A lesson belongs to a step by the step's text, not its number, so that adding
+or reordering steps does not move lessons to the wrong step.
+
+The edge-case file has a `learned-` prefix so that it never overwrites a
+reference file that an adopted skill already has.
 
 ## Lifecycle
 
@@ -87,7 +103,10 @@ design.
    2), bluer rebuilds `SKILL.md`. Lessons for steps that still exist stay.
    Lessons for a removed step are archived, not deleted, so they come back if
    the step comes back.
-6. **Roll back.** The user can return `SKILL.md` to any earlier version.
+6. **Roll back.** The user can return the learned layer to any earlier
+   version. Rollback restores `learnings.md` from that version and builds a new
+   version from it. It never changes `intent.md`: it undoes what was learned,
+   not what the owner wrote.
 
 ## Intent drift
 
@@ -203,7 +222,9 @@ From most to least valuable:
 3. **The agent's own failures** inside the skill: a command that fails, a step
    that had to be done again.
 4. **Hand edits to `SKILL.md`.** `SKILL.md` is built, so a rebuild would lose a
-   hand edit. bluer must detect the edit and turn it into a lesson instead.
+   hand edit. bluer detects the edit by its hash, saves a copy in
+   `hand-edits/`, and records a pending lesson that points to it. The agent
+   then turns the edit into real lessons.
 
 ## Guardrails for auto-apply
 

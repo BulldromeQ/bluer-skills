@@ -9,6 +9,28 @@ generated, versioned `SKILL.md` that improves with use. Read
 [README.md](README.md) for the idea and [docs/design.md](docs/design.md) for
 the decisions and open questions.
 
+## Develop
+
+Requires Node.js 22.18 or later (Node runs the TypeScript source directly) and git.
+
+```bash
+npm install
+npm run typecheck   # tsc, no output files
+npm test            # node --test on test/**/*.test.ts
+npm run build       # compile src/ to dist/ for the npm package
+node src/main.ts help
+```
+
+- `src/store.ts` holds the skill operations; `src/cli.ts` only parses arguments
+  and prints. `src/build.ts` and `src/gate.ts` are pure functions: keep file and
+  git access out of them.
+- Write imports with the `.ts` extension. `tsc` rewrites them to `.js` in `dist/`.
+- Use only erasable TypeScript syntax (no `enum`, no `namespace`, no parameter
+  properties), because Node strips types without compiling.
+- Tests that touch files use a temp folder and set `home` and `userHome` in the
+  `Context`. The CLI reads `BLUER_HOME`, `HOME` and `BLUER_TODAY` (a fixed date
+  for tests). Never let a test write to the real `~/.bluer` or `~/.claude`.
+
 ## Rules
 
 - Change `docs/design.md` in the same pull request as a change to the design.

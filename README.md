@@ -8,7 +8,9 @@ agent then improves that skill each time it uses it. Your plain version stays
 yours and stays easy to read. The agent keeps a detailed, versioned version next
 to it.
 
-> **Status:** design stage. Nothing is ready to install yet. See
+> **Status:** early. The `bluer` CLI core works (create, learn, build,
+> versions, rollback, adopt, link to Claude Code). It is not on npm yet. The
+> Claude Code plugin that captures lessons on its own is next. See
 > [docs/design.md](docs/design.md) for the design and the open questions.
 
 ## The idea
@@ -75,11 +77,32 @@ Any agent that reads skills can use it, with or without bluer installed.
 - **It works across agents.** Claude Code is first. Gemini CLI, OpenAI Codex,
   Cursor and GitHub Copilot follow.
 
+## Try it
+
+Requires Node.js 22.18 or later, and git.
+
+```bash
+git clone git@github.com:BulldromeQ/bluer-skills.git && cd bluer-skills
+npm install
+alias bluer="node $PWD/src/main.ts"
+
+bluer new "Doing house work, 1. clean the table, 2. clean the restroom, 3. clean the kitchen"
+bluer learn doing-house-work "Wipe with a damp cloth, then dry it" --step 1
+bluer learn doing-house-work "Never use bleach, we have a cat" --always
+bluer status doing-house-work
+bluer history doing-house-work
+```
+
+`bluer new` links the skill into `~/.claude/skills`, so Claude Code can use it
+at once. Set `BLUER_HOME` to try bluer without touching `~/.bluer`.
+
 ## Roadmap
 
-1. Design (now).
-2. Claude Code: create a skill from plain text, build `SKILL.md`, versions.
-3. Claude Code: capture lessons during sessions, auto-apply, roll back.
+1. Design. Done.
+2. CLI core: create a skill from plain text, learning gate, build `SKILL.md`,
+   versions, rollback, adopt, link to Claude Code. Done.
+3. Claude Code plugin: `/bluer` chat commands, hooks that capture lessons in
+   every session, trigger tests. Next.
 4. Gemini CLI.
 5. OpenAI Codex.
 6. Cursor.
