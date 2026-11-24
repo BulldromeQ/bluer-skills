@@ -80,7 +80,8 @@ skill, link it into the project: `.claude/skills/<name>`.
 - Tests that touch files use a temp folder and set `home` and `userHome` in the
   `Context`. The CLI reads `BLUER_HOME`, `BLUER_USER_HOME`, `BLUER_TODAY` (a
   fixed date for tests) and `BLUER_CLI_PATH` (the CLI path hooks write into the
-  shim). Never let a test write to the real `~/.bluer`, `~/.claude` or `~/.gemini`.
+  shim). The wrapper `plugins/claude-code/bin/bluer` reads `BLUER_NODE`: set it
+  to a missing path to test what users without Node.js see. Never let a test write to the real `~/.bluer`, `~/.claude` or `~/.gemini`.
 
 ## Rules
 

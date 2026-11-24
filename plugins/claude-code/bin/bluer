@@ -2,14 +2,23 @@
 # Runs the bluer CLI that ships with this plugin (bluer.mjs, built from src/
 # by "npm run build:plugin"). It needs Node.js 20 or later.
 #
-# An app can start Claude Code with a PATH that does not hold Node (for example
+# An app can start an agent with a PATH that does not hold Node (for example
 # without /opt/homebrew/bin), so when PATH has no `node`, this script also looks
-# in the usual install folders.
+# in the usual install folders. Set BLUER_NODE to a Node.js path to use only
+# that one.
 #
-# Hooks call this script too. Without Node.js, a hook exits quietly so that it
-# never blocks a Claude Code session.
+# Hooks call this script too ("bluer hook <agent> <event>"). Without a usable
+# Node.js, the session-start hook tells the user, in a message the agent shows,
+# how to fix it. The other hooks exit quietly, so that they never block or
+# clutter a session.
+
+MIN_NODE=20
 
 find_node() {
+  if [ -n "${BLUER_NODE:-}" ]; then
+    [ -x "$BLUER_NODE" ] && echo "$BLUER_NODE" && return 0
+    return 1
+  fi
   if command -v node >/dev/null 2>&1; then
     command -v node
     return 0
@@ -38,9 +47,50 @@ find_node() {
   return 1
 }
 
-if ! NODE=$(find_node); then
-  if [ "$1" = "hook" ]; then exit 0; fi
-  echo "bluer: Node.js 20 or later is needed. Install it from https://nodejs.org and try again." >&2
-  exit 1
+# Prints the problem with Node.js, or nothing when it is usable.
+node_problem() {
+  if [ -z "$NODE" ]; then
+    echo "bluer needs Node.js $MIN_NODE or later, and this computer does not have it."
+    return
+  fi
+  version=$("$NODE" --version 2>/dev/null)
+  major=${version#v}
+  major=${major%%.*}
+  case "$major" in
+    '' | *[!0-9]*) echo "bluer needs Node.js $MIN_NODE or later, and the Node.js it found does not run." ;;
+    *) [ "$major" -lt "$MIN_NODE" ] && echo "bluer needs Node.js $MIN_NODE or later, and this computer has Node.js $version." ;;
+  esac
+}
+
+agent_name() {
+  case "$1" in
+    claude-code) echo "Claude Code" ;;
+    gemini-cli) echo "Gemini CLI" ;;
+    *) echo "your agent" ;;
+  esac
+}
+
+NODE=$(find_node) || NODE=""
+
+if [ "$1" = "hook" ]; then
+  # Only the session-start hook checks the version, once per session; the other
+  # hooks run often and stay fast.
+  if [ "$3" = "session-start" ]; then
+    problem=$(node_problem)
+    if [ -n "$problem" ]; then
+      fix="Install the LTS version from https://nodejs.org, then restart $(agent_name "$2")."
+      message="$problem Your bluer skills still work, but they do not learn until then. $fix"
+      # No quotes or backslashes in these texts, so they are safe in JSON as they are.
+      printf '{"systemMessage":"%s","hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"bluer cannot run in this session. %s If the user asks to create, teach or use a bluer skill, tell them this first."}}\n' "$message" "$message"
+      exit 0
+    fi
+  fi
+  [ -z "$NODE" ] && exit 0
+else
+  problem=$(node_problem)
+  if [ -n "$problem" ]; then
+    echo "bluer: $problem Install the LTS version from https://nodejs.org and try again." >&2
+    exit 1
+  fi
 fi
 exec "$NODE" "$(dirname "$0")/bluer.mjs" "$@"

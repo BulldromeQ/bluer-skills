@@ -198,16 +198,48 @@ describe("plugin bin/bluer", () => {
     assert.match(r.stdout, /bluer new/);
   });
 
-  it("exits quietly for a hook, and with a clear error otherwise, when there is no Node", { skip: existsSync("/usr/bin/node") && "this machine has /usr/bin/node" }, () => {
+  const runBin = (env: Record<string, string>, args: string[]) =>
+    spawnSync("/bin/sh", [script, ...args], { env: { ...bare, ...env }, encoding: "utf8", input: "{}" });
+  const tempRoot = (): string => {
     const root = mkdtempSync(join(tmpdir(), "bluer-bin-"));
     roots.push(root);
-    const env = { ...bare, HOME: root };
-    if (existsSync("/opt/homebrew/bin/node") || existsSync("/usr/local/bin/node")) return; // a usual folder has Node; nothing to test here
-    const hook = spawnSync("/bin/sh", [script, "hook", "claude-code", "session-start"], { env, encoding: "utf8", input: "{}" });
-    assert.deepEqual([hook.status, hook.stdout, hook.stderr], [0, "", ""]);
-    const cli = spawnSync("/bin/sh", [script, "list"], { env, encoding: "utf8" });
+    return root;
+  };
+
+  it("tells the user at session start when there is no Node, and keeps the other hooks quiet", () => {
+    const env = { HOME: tempRoot(), BLUER_NODE: "/no/such/node" };
+    const start = runBin(env, ["hook", "claude-code", "session-start"]);
+    assert.equal(start.status, 0);
+    const out = JSON.parse(start.stdout) as { systemMessage: string; hookSpecificOutput: { hookEventName: string; additionalContext: string } };
+    assert.match(out.systemMessage, /^bluer needs Node\.js 20 or later, and this computer does not have it\. .*https:\/\/nodejs\.org, then restart Claude Code\.$/);
+    assert.equal(out.hookSpecificOutput.hookEventName, "SessionStart");
+    assert.match(out.hookSpecificOutput.additionalContext, /^bluer cannot run in this session\. .*tell them this first\.$/);
+
+    const gemini = JSON.parse(runBin(env, ["hook", "gemini-cli", "session-start"]).stdout) as { systemMessage: string };
+    assert.match(gemini.systemMessage, /restart Gemini CLI\.$/);
+
+    const prompt = runBin(env, ["hook", "claude-code", "user-prompt-submit"]);
+    assert.deepEqual([prompt.status, prompt.stdout, prompt.stderr], [0, "", ""]);
+    const cli = runBin(env, ["list"]);
     assert.equal(cli.status, 1);
-    assert.match(cli.stderr, /Node\.js 20 or later is needed/);
+    assert.match(cli.stderr, /^bluer: bluer needs Node\.js 20 or later, and this computer does not have it\./);
+  });
+
+  it("names a Node.js that is too old", () => {
+    const root = tempRoot();
+    const fake = join(root, "node");
+    writeFileSync(fake, "#!/bin/sh\necho v18.19.0\n", { mode: 0o755 });
+    const start = runBin({ HOME: root, BLUER_NODE: fake }, ["hook", "claude-code", "session-start"]);
+    assert.match((JSON.parse(start.stdout) as { systemMessage: string }).systemMessage, /this computer has Node\.js v18\.19\.0\./);
+    const cli = runBin({ HOME: root, BLUER_NODE: fake }, ["list"]);
+    assert.equal(cli.status, 1);
+    assert.match(cli.stderr, /has Node\.js v18\.19\.0/);
+  });
+
+  it("uses BLUER_NODE when it points at a usable Node.js", () => {
+    const r = runBin({ HOME: tempRoot(), BLUER_NODE: process.execPath }, ["help"]);
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /bluer new/);
   });
 });
 

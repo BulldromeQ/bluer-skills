@@ -7,7 +7,8 @@ the skill.
 
 ## Install
 
-Requires Node.js 20 or later.
+Requires Node.js 20 or later. If it is missing or too old, the plugin tells you
+when Claude Code starts.
 
 ```text
 /plugin marketplace add BulldromeQ/bluer-skills
@@ -32,8 +33,10 @@ Requires Node.js 20 or later.
 | `hooks/hooks.json` | `SessionStart` writes `~/.bluer/bin/bluer`; `PostToolUse` (Skill) counts a run and tells Claude how to record lessons; `UserPromptSubmit` reminds Claude when a message looks like a lesson; `SessionEnd` rebuilds the skills used |
 | `bin/bluer`, `bin/bluer.mjs` | The bluer CLI, bundled into one file. Built from `src/` with `npm run build:plugin`; do not edit it by hand |
 
-Hooks never block a session: on any error they print to stderr and exit 0, and
-without Node.js they do nothing.
+Hooks never block a session: on any error they print to stderr and exit 0.
+Without a usable Node.js, the `SessionStart` hook shows a message with the fix
+and the other hooks do nothing. Set `BLUER_NODE` to a Node.js path to skip the
+search.
 
 ## Privacy
 

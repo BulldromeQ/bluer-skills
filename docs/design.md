@@ -404,6 +404,10 @@ Findings from the Claude Code adapter:
   pruned after 7 days instead of deleted at `SessionEnd`.
 - The plugin's install path changes with each update. Hooks write a stable shim
   at `~/.bluer/bin/bluer`, so "don't ask again" permission rules keep working.
+- A hook can show text to the user with `systemMessage`. When Node.js is missing
+  or older than 20, the `bin/bluer` wrapper (plain `sh`) prints that JSON itself
+  at `SessionStart`, so the user learns how to fix it. Gemini CLI supports the
+  same field.
 - An agent tends to mark a direct instruction ("keep it under 150 words") as a
   rule. That is right: the gate is for situational corrections and edge cases,
   not for rules the user states. `--always` means "a standing rule".
@@ -446,6 +450,8 @@ Check each agent's current hook and skill support when its adapter is built.
 | Build in intent mode and base mode; edge-case file | Built |
 | Lessons follow steps by text; archive and restore with the step | Built |
 | Lesson receipts, `bluer forget` (`--last`) and `bluer restore`; `status` lists each lesson | Built; tested live in Claude Code and Gemini CLI |
+| Session-start message when Node.js is missing or too old; `BLUER_NODE` | Built; tested live in Claude Code and Gemini CLI |
+| Prebuilt CLI binaries, so that users need no Node.js | Planned |
 | Hand-edit detection and saving | Built |
 | Git versions, history, rollback that keeps `intent.md` | Built |
 | Link into each installed agent's skills folder; never overwrite without `--replace` | Built |

@@ -32,7 +32,9 @@ back.
 
 ## Install
 
-Requires [Node.js](https://nodejs.org) 20 or later.
+Requires [Node.js](https://nodejs.org) 20 or later. Not sure if you have it?
+Install bluer anyway: if Node.js is missing or too old, bluer tells you when your
+agent starts, with the link to fix it.
 
 ### Claude Code
 
@@ -252,6 +254,11 @@ before it is used, set the skill to `review`.
 `bluer` command the first time. In Claude Code, choose "don't ask again" for
 `~/.bluer/bin/bluer`. In Gemini CLI, choose "Allow for all future sessions".
 That path stays the same across updates.
+
+**My agent says bluer needs Node.js. What do I do?** Install the LTS version
+from [nodejs.org](https://nodejs.org), then restart your agent. Until then your
+skills still work, but they do not learn. If Node.js is installed in an unusual
+folder, set `BLUER_NODE` to its full path.
 
 **Does anything leave my machine?** No. Sharing lessons with a skill's author is
 planned, and it will always show you the exact text and wait for your yes.
