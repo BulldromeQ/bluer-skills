@@ -43,7 +43,7 @@ later from https://nodejs.org, then try again.
   output. Never record passwords, tokens or keys.
 - Keep each lesson short, one idea, close to the user's words.
 - Run each bluer command as its own call, with the full path. Do not put the
-  path in a shell variable: the permission check refuses such commands.
+  path in a shell variable: permission checks can refuse such commands.
 - After each bluer command, tell the user in one plain sentence what changed.
   Do not show lesson ids or version numbers unless they ask.
 

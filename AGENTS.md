@@ -18,7 +18,7 @@ npm install
 npm run typecheck   # tsc, no output files
 npm test            # node --test on test/**/*.test.ts
 npm run build       # compile src/ to dist/ for the npm package
-npm run build:plugin  # bundle src/ into plugins/claude-code/bin/bluer.mjs
+npm run build:plugin  # bundle src/ into plugins/claude-code/bin/bluer.mjs, generate skills/bluer/SKILL.md
 node src/main.ts help
 ```
 
@@ -27,6 +27,18 @@ The Claude Code plugin ships the CLI as one bundled file,
 own folder and no `node_modules`. Run `npm run build:plugin` after any change in
 `src/` and commit the bundle. CI fails when the bundle is out of date.
 
+The Gemini CLI extension lives at the repo root, because Gemini CLI installs an
+extension only from a repository root: `gemini-extension.json`,
+`hooks/hooks.json`, `commands/bluer/*.toml` and `skills/bluer/SKILL.md`. Its
+hooks run the same bundle. `skills/bluer/SKILL.md` is generated from
+`plugins/claude-code/skills/bluer/SKILL.md` by `scripts/build-gemini-extension.ts`
+(part of `npm run build:plugin`). Edit the Claude Code skill, never the generated
+copy. CI fails when the copy is out of date.
+
+`claude plugin validate .` warns that `BeforeAgent` and `AfterTool` in
+`hooks/hooks.json` are unknown events. Ignore it: that file is for Gemini CLI,
+and the Claude Code marketplace installs only `plugins/claude-code`.
+
 Test the plugin by hand with Claude Code's own tools:
 
 ```bash
@@ -34,6 +46,15 @@ claude plugin validate ./plugins/claude-code
 claude plugin validate .
 BLUER_HOME=/tmp/bt/bluer BLUER_USER_HOME=/tmp/bt/user \
   claude --plugin-dir ./plugins/claude-code
+```
+
+Test the extension by hand with a scratch home, so that nothing touches your
+real `~/.gemini`:
+
+```bash
+export GEMINI_CLI_HOME=/tmp/gt BLUER_HOME=/tmp/gt/bluer BLUER_USER_HOME=/tmp/gt
+gemini extensions link .
+gemini
 ```
 
 The plugin icon (`plugins/claude-code/.claude-plugin/icon.png`, also used in the
@@ -57,7 +78,7 @@ skill, link it into the project: `.claude/skills/<name>`.
 - Tests that touch files use a temp folder and set `home` and `userHome` in the
   `Context`. The CLI reads `BLUER_HOME`, `BLUER_USER_HOME`, `BLUER_TODAY` (a
   fixed date for tests) and `BLUER_CLI_PATH` (the CLI path hooks write into the
-  shim). Never let a test write to the real `~/.bluer` or `~/.claude`.
+  shim). Never let a test write to the real `~/.bluer`, `~/.claude` or `~/.gemini`.
 
 ## Rules
 

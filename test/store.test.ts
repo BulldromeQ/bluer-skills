@@ -238,3 +238,13 @@ describe("describeSkill and addStep", () => {
     assert.equal(store.learn(ctx, name, { text: "Use the blue cloth", step: "1", source: "creator" }).tier, "rule");
   });
 });
+
+describe("linking to several agents", () => {
+  it("links once per skills folder, into each installed agent", () => {
+    const ctx = setup();
+    mkdirSync(join(ctx.userHome, ".gemini"), { recursive: true });
+    const made = store.createSkill(ctx, HOUSE);
+    assert.deepEqual(made.links.map((l) => [l.agent.id, l.result]), [["claude-code", "linked"], ["gemini-cli", "linked"]]);
+    assert.ok(lstatSync(join(ctx.userHome, ".agents", "skills", made.name)).isSymbolicLink());
+  });
+});

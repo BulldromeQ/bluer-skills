@@ -1,23 +1,25 @@
 import { chmodSync, closeSync, existsSync, fstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import * as store from "../store.ts";
+import type { AgentAdapter } from "./types.ts";
 
 /**
- * Claude Code hook handlers. The plugin's hooks.json runs
- * `bluer hook claude-code <event>` with the hook's JSON on stdin; whatever
- * handleHook returns is printed to stdout for Claude Code.
+ * Hook handlers shared by every agent. An agent's plugin or extension runs
+ * `bluer hook <agent> <event>` with the hook's JSON on stdin; whatever
+ * handleHook returns is printed to stdout for the agent. Each agent's
+ * differences (event names, skill tool) live in its adapter's HookDialect.
  *
  * What each hook does (see docs/design.md, section 9):
  * - session-start: write the `bluer` shim, so the agent has a stable command,
  *   and prune session state older than a week.
- * - post-tool-use (matcher "Skill"): when a bluer skill loads, count a run,
+ * - post-tool-use (matcher: the skill tool): when a bluer skill loads, count a run,
  *   remember it for this session, and tell the agent how to record lessons.
  *   When one of the plugin's own skills loads, tell the agent the CLI path.
  * - user-prompt-submit: when a bluer skill is in use and the message looks like
- *   a lesson, remind the agent to record it. A "/<skill>" message also counts
- *   as loading the skill.
+ *   a lesson, remind the agent to record it. Where "/<skill>" skips the skill
+ *   tool, the message also counts as loading the skill.
  * - session-end: rebuild the skills used in the session. The session's state
- *   stays, because `claude --continue` resumes the same session.
+ *   stays, because a session can be resumed (`claude --continue`).
  */
 export const HOOK_EVENTS = ["session-start", "user-prompt-submit", "post-tool-use", "session-end"] as const;
 export type HookEvent = (typeof HOOK_EVENTS)[number];
@@ -27,7 +29,7 @@ export interface HookInput {
   transcript_path?: string;
   prompt?: string;
   tool_name?: string;
-  tool_input?: { skill?: unknown };
+  tool_input?: Record<string, unknown>;
 }
 
 interface SessionState {
@@ -35,30 +37,31 @@ interface SessionState {
   skills: string[];
 }
 
-/** The plugin's name in .claude-plugin/plugin.json. Its skills load as "bluer:<skill>". */
-export const PLUGIN_NAME = "bluer";
-
 export const shimPath = (home: string): string => join(home, "bin", "bluer");
 
 const STATE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-const stateDir = (home: string): string => join(home, "state", "claude-code");
+const stateDir = (home: string, agent: string): string => join(home, "state", agent);
 
 /** Delete session state files that have not changed for a week. */
 export function pruneState(home: string, now = Date.now()): void {
-  const dir = stateDir(home);
-  if (!existsSync(dir)) return;
-  for (const file of readdirSync(dir)) {
-    const path = join(dir, file);
-    if (now - statSync(path).mtimeMs > STATE_TTL_MS) rmSync(path, { force: true });
+  const root = join(home, "state");
+  if (!existsSync(root)) return;
+  for (const agent of readdirSync(root)) {
+    const dir = join(root, agent);
+    if (!statSync(dir).isDirectory()) continue;
+    for (const file of readdirSync(dir)) {
+      const path = join(dir, file);
+      if (now - statSync(path).mtimeMs > STATE_TTL_MS) rmSync(path, { force: true });
+    }
   }
 }
 
-const statePath = (home: string, sessionId: string): string =>
-  join(stateDir(home), `${sessionId.replace(/[^A-Za-z0-9_-]/g, "_") || "unknown"}.json`);
+const statePath = (home: string, agent: string, sessionId: string): string =>
+  join(stateDir(home, agent), `${sessionId.replace(/[^A-Za-z0-9_-]/g, "_") || "unknown"}.json`);
 
-function loadState(home: string, sessionId: string): SessionState {
-  const file = statePath(home, sessionId);
+function loadState(home: string, agent: string, sessionId: string): SessionState {
+  const file = statePath(home, agent, sessionId);
   if (!existsSync(file)) return { skills: [] };
   try {
     const parsed = JSON.parse(readFileSync(file, "utf8")) as Partial<SessionState>;
@@ -68,8 +71,8 @@ function loadState(home: string, sessionId: string): SessionState {
   }
 }
 
-function saveState(home: string, sessionId: string, state: SessionState): void {
-  const file = statePath(home, sessionId);
+function saveState(home: string, agent: string, sessionId: string, state: SessionState): void {
+  const file = statePath(home, agent, sessionId);
   mkdirSync(dirname(file), { recursive: true });
   writeFileSync(file, JSON.stringify(state) + "\n");
 }
@@ -90,7 +93,7 @@ export function installShim(home: string, cliPath: string, nodePath: string = pr
   const cli = shellQuote(cliPath);
   const body =
     "#!/bin/sh\n" +
-    "# Written by the bluer Claude Code plugin at each session start.\n" +
+    "# Written by a bluer agent plugin at each session start.\n" +
     "# It runs the bluer CLI that ships with the plugin.\n" +
     `if command -v node >/dev/null 2>&1; then exec node ${cli} "$@"; fi\n` +
     `exec ${shellQuote(nodePath)} ${cli} "$@"\n`;
@@ -114,16 +117,18 @@ export function lastAssistantAsked(transcriptPath: string | undefined): boolean 
   const tail = readTail(transcriptPath, 256 * 1024);
   const lines = tail.split("\n");
   for (let i = lines.length - 1; i >= 0; i--) {
-    let entry: { type?: string; message?: { content?: unknown } };
+    // Claude Code: { type: "assistant", message: { content } }. Gemini CLI: { type: "gemini", content }.
+    let entry: { type?: string; content?: unknown; message?: { content?: unknown } };
     try {
       entry = JSON.parse(lines[i] ?? "");
     } catch {
       continue;
     }
-    if (entry.type !== "assistant") continue;
-    const content = entry.message?.content;
+    if (entry.type !== "assistant" && entry.type !== "gemini") continue;
+    const content = entry.message?.content ?? entry.content;
+    // Claude Code: [{ type: "text", text }]. Gemini CLI: a string, or [{ text }].
     const texts = Array.isArray(content)
-      ? content.flatMap((b: { type?: string; text?: unknown }) => (b?.type === "text" && typeof b.text === "string" ? [b.text] : []))
+      ? content.flatMap((b: { type?: string; text?: unknown }) => ((b?.type === "text" || b?.type === undefined) && typeof b?.text === "string" ? [b.text] : []))
       : typeof content === "string"
         ? [content]
         : [];
@@ -146,8 +151,9 @@ function readTail(path: string, bytes: number): string {
   }
 }
 
+// No angle brackets in these texts: Gemini CLI escapes "<" and ">" in hook context.
 const LEARN_USAGE = (cli: string, name: string): string =>
-  `${cli} learn ${name} "<the lesson, short, in the user's words>" [--step <number>] [--source answer|correction|failure] [--always] [--one-off] [--impact medium|high]`;
+  `${cli} learn ${name} "LESSON" [--step N] [--source answer|correction|failure] [--always] [--one-off] [--impact medium|high], where LESSON is short and in the user's words`;
 
 export function loadedText(cli: string, name: string): string {
   return [
@@ -166,21 +172,20 @@ export function nudgeText(cli: string, name: string): string {
   return `bluer: if this message teaches the skill "${name}" something (a correction, an answer to your question, an always/never rule), record it once you have acted on it: ${LEARN_USAGE(cli, name)}. If it does not, ignore this note.`;
 }
 
-function context(event: "PostToolUse" | "UserPromptSubmit", text: string): string {
-  return JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: text } });
-}
-
-function markLoaded(ctx: store.Context, sessionId: string, name: string): void {
-  store.recordRun(ctx, name);
-  const state = loadState(ctx.home, sessionId);
-  state.skills = [...state.skills.filter((s) => s !== name), name];
-  saveState(ctx.home, sessionId, state);
-}
-
-/** Handle one hook event and return what to print on stdout ("" for nothing). */
-export function handleHook(event: HookEvent, input: HookInput, ctx: store.Context, opts: { cliPath: string }): string {
+/** Handle one hook event for one agent and return what to print on stdout ("" for nothing). */
+export function handleHook(agent: AgentAdapter, event: HookEvent, input: HookInput, ctx: store.Context, opts: { cliPath: string }): string {
+  const dialect = agent.hooks;
+  if (!dialect) return "";
   const sessionId = input.session_id ?? "unknown";
   const cli = shimPath(ctx.home);
+  const context = (forEvent: HookEvent, text: string): string =>
+    JSON.stringify({ hookSpecificOutput: { hookEventName: dialect.eventNames[forEvent], additionalContext: text } });
+  const markLoaded = (name: string): void => {
+    store.recordRun(ctx, name);
+    const state = loadState(ctx.home, agent.id, sessionId);
+    state.skills = [...state.skills.filter((s) => s !== name), name];
+    saveState(ctx.home, agent.id, sessionId, state);
+  };
 
   switch (event) {
     case "session-start":
@@ -189,32 +194,32 @@ export function handleHook(event: HookEvent, input: HookInput, ctx: store.Contex
       return "";
 
     case "post-tool-use": {
-      if (input.tool_name !== "Skill") return "";
-      const name = String(input.tool_input?.skill ?? "").replace(/^\//, "");
-      if (name.startsWith(`${PLUGIN_NAME}:`)) {
+      if (input.tool_name !== dialect.skillTool) return "";
+      const name = String(input.tool_input?.[dialect.skillField] ?? "").replace(/^\//, "");
+      if (dialect.isOwnSkill(name)) {
         installShim(ctx.home, opts.cliPath);
-        return context("PostToolUse", `bluer: run the bluer CLI as ${cli} in this session.`);
+        return context("post-tool-use", `bluer: run the bluer CLI as ${cli} in this session.`);
       }
       if (!store.hasSkill(ctx, name)) return "";
-      markLoaded(ctx, sessionId, name);
-      return context("PostToolUse", loadedText(cli, name));
+      markLoaded(name);
+      return context("post-tool-use", loadedText(cli, name));
     }
 
     case "user-prompt-submit": {
       const prompt = input.prompt ?? "";
       const slash = /^\/([a-z0-9]+(?:-[a-z0-9]+)*)(?:\s|$)/.exec(prompt.trim())?.[1];
-      if (slash && store.hasSkill(ctx, slash)) {
-        markLoaded(ctx, sessionId, slash);
-        return context("UserPromptSubmit", loadedText(cli, slash));
+      if (dialect.slashSkipsTool && slash && store.hasSkill(ctx, slash)) {
+        markLoaded(slash);
+        return context("user-prompt-submit", loadedText(cli, slash));
       }
-      const active = loadState(ctx.home, sessionId).skills.at(-1);
+      const active = loadState(ctx.home, agent.id, sessionId).skills.at(-1);
       if (!active || !store.hasSkill(ctx, active)) return "";
       if (!looksLikeLesson(prompt) && !lastAssistantAsked(input.transcript_path)) return "";
-      return context("UserPromptSubmit", nudgeText(cli, active));
+      return context("user-prompt-submit", nudgeText(cli, active));
     }
 
     case "session-end": {
-      const state = loadState(ctx.home, sessionId);
+      const state = loadState(ctx.home, agent.id, sessionId);
       for (const name of state.skills) {
         if (store.hasSkill(ctx, name)) store.rebuild(ctx, name);
       }

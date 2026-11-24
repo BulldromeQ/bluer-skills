@@ -2,7 +2,7 @@ import { readFileSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { parseArgs } from "node:util";
 import { claudeCode } from "./agents/claude-code.ts";
-import { handleHook, HOOK_EVENTS, type HookEvent, type HookInput } from "./agents/claude-code-hooks.ts";
+import { handleHook, HOOK_EVENTS, type HookEvent, type HookInput } from "./agents/hooks.ts";
 import { findAgent } from "./agents/index.ts";
 import { BluerError } from "./errors.ts";
 import { defaultHome, initHome, loadSettings } from "./home.ts";
@@ -30,7 +30,7 @@ Usage:
   bluer rollback <skill> <version>              Return a skill to an earlier version
   bluer link <skill> [--agent <id>] [--replace] Make a skill visible to an agent (default: ${claudeCode.id})
   bluer init                                    Create the bluer home (done on first use)
-  bluer hook claude-code <event>                Used by the Claude Code plugin; reads the hook JSON on stdin
+  bluer hook <agent> <event>                    Used by agent plugins (claude-code, gemini-cli); reads the hook JSON on stdin
 
 Skills live in $BLUER_HOME (default ~/.bluer). Agent folders are found under $BLUER_USER_HOME (default: your home folder).`;
 
@@ -207,15 +207,16 @@ export function run(
  */
 function runHook(args: string[], env: NodeJS.ProcessEnv, out: Out, readStdin: () => string): void {
   try {
-    const [agent, event] = args;
-    if (agent !== claudeCode.id) throw new BluerError(`Hooks exist only for ${claudeCode.id}.`);
+    const [agentId, event] = args;
+    const agent = findAgent(agentId ?? "");
+    if (!agent.hooks) throw new BluerError(`bluer has no hooks for ${agent.displayName}.`);
     if (!HOOK_EVENTS.includes(event as HookEvent)) throw new BluerError(`Unknown hook event "${event ?? ""}".`);
     const raw = readStdin().trim();
     const input = (raw ? JSON.parse(raw) : {}) as HookInput;
     const ctx = context(env);
     initHome(ctx.home);
     const cliPath = env.BLUER_CLI_PATH || realpathSync(process.argv[1] ?? ".");
-    const output = handleHook(event as HookEvent, input, ctx, { cliPath });
+    const output = handleHook(agent, event as HookEvent, input, ctx, { cliPath });
     if (output) out(output);
   } catch (err) {
     console.error(`bluer hook: ${(err as Error).message}`);

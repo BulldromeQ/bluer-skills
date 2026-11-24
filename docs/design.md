@@ -366,14 +366,18 @@ layer. Section 12 explains why this case is still open.
 
 Each agent gets one adapter. An adapter provides:
 
-| Capability | What it does | Claude Code |
-|---|---|---|
-| Skill folder | Where the agent reads personal skills; bluer links skills there | `~/.claude/skills/<name>`; symlinks work |
-| Chat entry | Commands the user types in chat | A plugin with a `/bluer` skill |
-| Skill-in-use signal | Which skill is loaded, to count runs and route lessons | `PostToolUse` hook on the `Skill` tool |
-| Message capture | The user's messages, to find answers and corrections | `UserPromptSubmit` hook |
-| Session end | When to run the batch (gate, drift, tests) | `Stop` / `SessionEnd` hooks |
-| Headless run | Runs trigger tests | `claude -p --output-format stream-json` |
+| Capability | What it does | Claude Code | Gemini CLI |
+|---|---|---|---|
+| Skill folder | Where the agent reads personal skills; bluer links skills there | `~/.claude/skills/<name>`; symlinks work | `~/.agents/skills/<name>`; symlinks work |
+| Chat entry | Commands the user types in chat | A plugin with a `/bluer` skill | An extension with the `bluer` skill and TOML commands |
+| Skill-in-use signal | Which skill is loaded, to count runs and route lessons | `PostToolUse` hook on the `Skill` tool | `AfterTool` hook on the `activate_skill` tool |
+| Message capture | The user's messages, to find answers and corrections | `UserPromptSubmit` hook | `BeforeAgent` hook |
+| Session end | When to run the batch (gate, drift, tests) | `Stop` / `SessionEnd` hooks | `SessionEnd` hook |
+| Headless run | Runs trigger tests | `claude -p --output-format stream-json` | `gemini -p -o stream-json` |
+
+The hook logic is shared (`src/agents/hooks.ts`). Each adapter gives a small
+dialect: its event names, its skill tool and the input field that names the
+skill, and how its own bluer skill is named.
 
 Findings from the Claude Code adapter:
 
@@ -392,11 +396,32 @@ Findings from the Claude Code adapter:
   rule. That is right: the gate is for situational corrections and edge cases,
   not for rules the user states. `--always` means "a standing rule".
 
+Findings from the Gemini CLI adapter (Gemini CLI 0.68):
+
+- Gemini CLI installs an extension only from the root of a repository, so
+  `gemini-extension.json`, `hooks/`, `commands/` and `skills/` sit at the repo
+  root. The hooks run the same bundled CLI as the Claude Code plugin, through
+  `${extensionPath}/plugins/claude-code/bin/bluer`.
+- `${extensionPath}` is replaced in the manifest and in `hooks/hooks.json`, but
+  not in a skill body. The extension's `skills/bluer/SKILL.md` is generated from
+  the Claude Code skill by `scripts/build-gemini-extension.ts` and uses the
+  stable shim `~/.bluer/bin/bluer`.
+- Gemini CLI reads both `~/.gemini/skills` and `~/.agents/skills`. bluer links
+  into `~/.agents/skills`, which other agents also read.
+- A typed `/<skill>` also calls `activate_skill`, so the `AfterTool` hook counts
+  every run and the prompt hook does not need to catch the slash.
+- Gemini CLI escapes `<` and `>` in hook context, so the hook notes do not use
+  angle brackets.
+- The session log is JSONL. Model lines have `type: "gemini"` and the text in a
+  top-level `content` field, not in `message.content` as in Claude Code.
+- An extension cannot pre-approve a shell command. The user approves the
+  `bluer` command once ("Allow for all future sessions").
+
 An agent that cannot run a hook on each message gets a fallback: at the end of a
 session (or the start of the next one), the adapter scans the session log for
 lessons. This is enough for a first version of such an adapter.
 
-Order: Claude Code, then Gemini CLI, OpenAI Codex, Cursor and GitHub Copilot.
+Order: Claude Code, Gemini CLI, then OpenAI Codex, Cursor and GitHub Copilot.
 Check each agent's current hook and skill support when its adapter is built.
 
 ## 10. Status
@@ -410,7 +435,7 @@ Check each agent's current hook and skill support when its adapter is built.
 | Lessons follow steps by text; archive and restore with the step | Built |
 | Hand-edit detection and saving | Built |
 | Git versions, history, rollback that keeps `intent.md` | Built |
-| Link into Claude Code; never overwrite without `--replace` | Built |
+| Link into each installed agent's skills folder; never overwrite without `--replace` | Built |
 | Settings file with all four levels | Built (only `learning` and `gate` have an effect yet) |
 | External creators | Planned |
 | Claude Code plugin: `bluer` skill, `/bluer:new`, `/bluer:teach`, `/bluer:status`, capture hooks (route 1), run counting | Built; tested live with `claude -p --plugin-dir` |
@@ -421,7 +446,8 @@ Check each agent's current hook and skill support when its adapter is built.
 | Routes 2–4 (missed triggers, new-skill drafts, personal profile) | Planned |
 | Shared skills, `upstream/`, `intent.local.md`, sharing levels | Planned |
 | Secret removal in lessons | Planned |
-| Adapters for Gemini CLI, Codex, Cursor, Copilot | Planned |
+| Gemini CLI extension: `bluer` skill, `/bluer:new`, `/bluer:teach`, `/bluer:status`, capture hooks, run counting | Built; tested live with `gemini -p` |
+| Adapters for Codex, Cursor, Copilot | Planned |
 
 ## 11. Decision log
 

@@ -2,11 +2,12 @@ import { lstatSync, mkdirSync, readlinkSync, renameSync, symlinkSync } from "nod
 import { join, resolve } from "node:path";
 import { BluerError } from "../errors.ts";
 import { claudeCode } from "./claude-code.ts";
+import { geminiCli } from "./gemini-cli.ts";
 import type { AgentAdapter } from "./types.ts";
 
-export type { AgentAdapter } from "./types.ts";
+export type { AgentAdapter, HookDialect } from "./types.ts";
 
-export const AGENTS: AgentAdapter[] = [claudeCode];
+export const AGENTS: AgentAdapter[] = [claudeCode, geminiCli];
 
 export function findAgent(id: string): AgentAdapter {
   const agent = AGENTS.find((a) => a.id === id);

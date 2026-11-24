@@ -1,7 +1,7 @@
 # <img src="plugins/claude-code/.claude-plugin/icon.png" alt="" width="44"> bluer
 
 **bluer skills: agent skills you write in three lines, that get better every time they run.**
-For Claude Code today; Gemini CLI, OpenAI Codex, Cursor and GitHub Copilot next.
+For Claude Code and Gemini CLI today; OpenAI Codex, Cursor and GitHub Copilot next.
 
 [![CI](https://github.com/BulldromeQ/bluer-skills/actions/workflows/ci.yml/badge.svg)](https://github.com/BulldromeQ/bluer-skills/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -16,13 +16,17 @@ questions, gets corrected, makes mistakes. bluer turns each of those into a
 lesson and folds the good ones back into the skill. Your own short version stays
 short, in your words. The skill your agent reads grows the detail.
 
-> **Status: early.** The Claude Code plugin works: create skills in chat, and
-> your agent records what it learns while it uses them. Other agents and the npm
-> package come later. See the [roadmap](#roadmap).
+> **Status: early.** The Claude Code plugin and the Gemini CLI extension work:
+> create skills in chat, and your agent records what it learns while it uses
+> them. Other agents and the npm package come later. See the [roadmap](#roadmap).
 
-## Install (Claude Code)
+## Install
 
-Requires [Node.js](https://nodejs.org) 20 or later. In Claude Code, run:
+Requires [Node.js](https://nodejs.org) 20 or later.
+
+### Claude Code
+
+In Claude Code, run:
 
 ```text
 /plugin marketplace add BulldromeQ/bluer-skills
@@ -34,6 +38,20 @@ Or, on Claude Code 2.1.275 or later, in one step:
 ```text
 /plugin install bluer --marketplace BulldromeQ/bluer-skills
 ```
+
+### Gemini CLI
+
+In a terminal, run:
+
+```bash
+gemini extensions install https://github.com/BulldromeQ/bluer-skills
+```
+
+The extension adds the `bluer` skill and `/bluer:new`, `/bluer:teach` and
+`/bluer:status`. bluer links your skills into `~/.agents/skills`, where Gemini
+CLI finds them.
+
+### Then
 
 Then just ask: *"Make a skill for my weekly update email: 1. read my notes from
 this week, 2. write a short summary, 3. email it to my team."*
@@ -160,7 +178,7 @@ You can make the gate `strict` or `eager`. The default is `balanced`.
 | Agent | Status |
 |---|---|
 | Claude Code | Works: plugin with `/bluer:new`, `/bluer:teach`, `/bluer:status` and automatic lesson capture |
-| Gemini CLI | Planned |
+| Gemini CLI | Works: extension with `/bluer:new`, `/bluer:teach`, `/bluer:status` and automatic lesson capture |
 | OpenAI Codex | Planned |
 | Cursor | Planned |
 | GitHub Copilot | Planned |
@@ -183,8 +201,9 @@ bluer status weekly-update
 bluer history weekly-update
 ```
 
-`bluer new` links the skill into `~/.claude/skills`, so Claude Code can use it at
-once. Add `--no-link` to skip that.
+`bluer new` links the skill into the skills folder of each agent you have
+(`~/.claude/skills` for Claude Code, `~/.agents/skills` for Gemini CLI), so the
+agent can use it at once. Add `--no-link` to skip that.
 
 | Command | What it does |
 |---|---|
@@ -207,9 +226,10 @@ tell a person. bluer and your agent do the rest.
 **What if it learns something wrong?** Roll back with one command, or set the
 skill to `review` so that you approve each lesson first.
 
-**Will it ask me to approve commands?** Claude Code asks before it runs the
-`bluer` command the first time. Choose "don't ask again" for
-`~/.bluer/bin/bluer`; that path stays the same across plugin updates.
+**Will it ask me to approve commands?** Your agent asks before it runs the
+`bluer` command the first time. In Claude Code, choose "don't ask again" for
+`~/.bluer/bin/bluer`. In Gemini CLI, choose "Allow for all future sessions".
+That path stays the same across updates.
 
 **Does anything leave my machine?** No. Sharing lessons with a skill's author is
 planned, and it will always show you the exact text and wait for your yes.
@@ -230,7 +250,8 @@ to, keeps rare cases out of the way, and versions every change.
 - [ ] Intent drift reports, size budget for skills
 - [ ] New-skill drafts for work that repeats
 - [ ] Shared skills with a personal layer
-- [ ] Gemini CLI, OpenAI Codex, Cursor and GitHub Copilot adapters
+- [x] Gemini CLI extension
+- [ ] OpenAI Codex, Cursor and GitHub Copilot adapters
 
 ## Contributing
 

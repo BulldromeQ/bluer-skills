@@ -146,8 +146,17 @@ export interface LinkReport {
   reason?: string;
 }
 
+/** Link into each installed agent's skills folder, once per folder: several agents can share one (~/.agents/skills). */
 function linkToInstalledAgents(ctx: Context, name: string, dir: string): LinkReport[] {
-  return AGENTS.filter((a) => a.isInstalled(ctx.userHome)).map((agent) => {
+  const seen = new Set<string>();
+  const agents = AGENTS.filter((a) => {
+    if (!a.isInstalled(ctx.userHome)) return false;
+    const folder = a.skillsDir(ctx.userHome);
+    if (seen.has(folder)) return false;
+    seen.add(folder);
+    return true;
+  });
+  return agents.map((agent) => {
     try {
       return { agent, result: linkSkill(agent, { userHome: ctx.userHome, skillDir: dir, name, backupsDir: backupsDir(ctx.home) }) };
     } catch (err) {

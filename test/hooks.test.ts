@@ -4,7 +4,10 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, sym
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
-import { handleHook, installShim, lastAssistantAsked, looksLikeLesson, pruneState, shimPath } from "../src/agents/claude-code-hooks.ts";
+import { claudeCode } from "../src/agents/claude-code.ts";
+import { geminiCli } from "../src/agents/gemini-cli.ts";
+import { handleHook, installShim, lastAssistantAsked, looksLikeLesson, pruneState, shimPath, type HookEvent } from "../src/agents/hooks.ts";
+import type { AgentAdapter } from "../src/agents/types.ts";
 import { run } from "../src/cli.ts";
 import { DEFAULT_SETTINGS } from "../src/home.ts";
 import * as store from "../src/store.ts";
@@ -23,7 +26,7 @@ function setup(): { ctx: store.Context; root: string } {
 }
 
 const CLI = "/plugin/bin/bluer.mjs";
-const hook = (ctx: store.Context, event: Parameters<typeof handleHook>[0], input: object): string => handleHook(event, input, ctx, { cliPath: CLI });
+const hook = (ctx: store.Context, event: HookEvent, input: object, agent: AgentAdapter = claudeCode): string => handleHook(agent, event, input, ctx, { cliPath: CLI });
 const runs = (ctx: store.Context): number => JSON.parse(readFileSync(join(ctx.home, "skills", "weekly-update", "bluer.json"), "utf8")).runs;
 const contextOf = (out: string): { hookEventName: string; additionalContext: string } => JSON.parse(out).hookSpecificOutput;
 
@@ -205,5 +208,53 @@ describe("plugin bin/bluer", () => {
     const cli = spawnSync("/bin/sh", [script, "list"], { env, encoding: "utf8" });
     assert.equal(cli.status, 1);
     assert.match(cli.stderr, /Node\.js 20 or later is needed/);
+  });
+});
+
+describe("Gemini CLI dialect", () => {
+  it("counts a run when activate_skill loads a bluer skill, and answers as AfterTool", () => {
+    const { ctx } = setup();
+    const out = contextOf(hook(ctx, "post-tool-use", { session_id: "g1", tool_name: "activate_skill", tool_input: { name: "weekly-update" } }, geminiCli));
+    assert.equal(out.hookEventName, "AfterTool");
+    assert.match(out.additionalContext, /"weekly-update" is a bluer skill/);
+    assert.doesNotMatch(out.additionalContext, /[<>]/, "Gemini escapes angle brackets, so the text must not use them");
+    assert.equal(runs(ctx), 1);
+    assert.ok(existsSync(join(ctx.home, "state", "gemini-cli", "g1.json")));
+  });
+
+  it("ignores Claude Code's Skill tool and treats only \"bluer\" as its own skill", () => {
+    const { ctx } = setup();
+    assert.equal(hook(ctx, "post-tool-use", { session_id: "g1", tool_name: "Skill", tool_input: { skill: "weekly-update" } }, geminiCli), "");
+    assert.equal(hook(ctx, "post-tool-use", { session_id: "g1", tool_name: "activate_skill", tool_input: { name: "bluer:bluer" } }, geminiCli), "");
+    const own = contextOf(hook(ctx, "post-tool-use", { session_id: "g1", tool_name: "activate_skill", tool_input: { name: "bluer" } }, geminiCli));
+    assert.match(own.additionalContext, /run the bluer CLI as/);
+  });
+
+  it("reminds the agent on BeforeAgent, and leaves slashes to activate_skill", () => {
+    const { ctx } = setup();
+    assert.equal(hook(ctx, "user-prompt-submit", { session_id: "g1", prompt: "/weekly-update" }, geminiCli), "");
+    assert.equal(runs(ctx), 0);
+    hook(ctx, "post-tool-use", { session_id: "g1", tool_name: "activate_skill", tool_input: { name: "weekly-update" } }, geminiCli);
+    const out = contextOf(hook(ctx, "user-prompt-submit", { session_id: "g1", prompt: "No, shorter" }, geminiCli));
+    assert.equal(out.hookEventName, "BeforeAgent");
+  });
+
+  it("keeps each agent's sessions apart", () => {
+    const { ctx } = setup();
+    hook(ctx, "post-tool-use", { session_id: "same", tool_name: "activate_skill", tool_input: { name: "weekly-update" } }, geminiCli);
+    assert.equal(hook(ctx, "user-prompt-submit", { session_id: "same", prompt: "No, shorter" }, claudeCode), "");
+  });
+
+  it("reads a question from a Gemini CLI transcript", () => {
+    const { root } = setup();
+    const file = join(root, "gemini.jsonl");
+    const lines = [
+      { sessionId: "g1", kind: "main" },
+      { id: "1", type: "user", content: [{ text: "write my weekly update" }] },
+      { id: "2", type: "gemini", content: "Who should get the update?" },
+      { $set: { lastUpdated: "2026-11-24" } },
+    ];
+    writeFileSync(file, lines.map((l) => JSON.stringify(l)).join("\n") + "\n");
+    assert.equal(lastAssistantAsked(file), true);
   });
 });
