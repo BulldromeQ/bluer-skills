@@ -64,6 +64,12 @@ Any agent that reads skills can use it, with or without bluer installed.
 - **Lessons are applied automatically, and each change is a new version.** You
   can turn auto-apply off for one skill or for all skills, and you can roll back
   to any version.
+- **It learns all the time.** Once installed, bluer captures lessons in every
+  session, sends each one to the skill it belongs to, and drafts new skills for
+  work that repeats.
+- **It works with what you have.** Adopt the skills you already use, keep your
+  favorite skill-creation tool, and keep a personal learned layer on top of
+  skills that other people share.
 - **It works across agents.** Claude Code is first. Gemini CLI, OpenAI Codex,
   Cursor and GitHub Copilot follow.
 
