@@ -39,7 +39,7 @@ export const THRESHOLDS: Record<GateLevel, GateThresholds> = {
 export function classify(lesson: Lesson, level: GateLevel, today: string, runs: number): Tier {
   const t = THRESHOLDS[level];
   if (lesson.oneOff) return "ignored";
-  if (lesson.explicit || lesson.impact === "high") return "rule";
+  if (lesson.explicit || lesson.impact === "high" || lesson.source === "creator") return "rule";
   if (lesson.seen >= t.ruleAt) return "rule";
   if (lesson.seen >= t.edgeAt || lesson.impact === "medium") return "edge";
   const staleDays = lesson.lastSeen ? daysBetween(lesson.lastSeen, today) : 0;

@@ -217,7 +217,7 @@ for real rules:
 
 | Tier | Where it goes | When (level `balanced`) |
 |---|---|---|
-| Rule | Main body of `SKILL.md` | The user said "always", "never" or "remember this"; or the lesson prevented a costly failure (impact `high`); or it was seen 3 times |
+| Rule | Main body of `SKILL.md` | The user stated a standing rule ("always CC my manager", "keep it under 150 words", "remember this"); or the lesson prevented a costly failure (impact `high`); or it was seen 3 times |
 | Edge case | `references/learned-edge-cases.md`, read only when the case comes up | Seen 2 times, or impact `medium` |
 | Candidate | `learnings.md` only; the built skill does not change | Seen once, impact `low` |
 | Ignored | Kept in `learnings.md`, never built | About one run only ("this week, leave out the offsite planning"). A one-off that comes back is no longer a one-off. |
@@ -375,6 +375,23 @@ Each agent gets one adapter. An adapter provides:
 | Session end | When to run the batch (gate, drift, tests) | `Stop` / `SessionEnd` hooks |
 | Headless run | Runs trigger tests | `claude -p --output-format stream-json` |
 
+Findings from the Claude Code adapter:
+
+- Plugin skills load as `/<plugin>:<skill>`, so the plugin's skills are
+  `bluer:bluer`, `bluer:new`, `bluer:teach` and `bluer:status`.
+- A user who types `/<skill>` skips the `Skill` tool, so `PostToolUse` does not
+  fire. The `UserPromptSubmit` hook catches the slash and counts the run.
+- Claude Code's permission check refuses a command that sets a shell variable
+  (`B=...; $B learn`). The skill and the hook note tell the agent to run each
+  command with its full path.
+- `claude --continue` resumes the same session, so session state is kept and
+  pruned after 7 days instead of deleted at `SessionEnd`.
+- The plugin's install path changes with each update. Hooks write a stable shim
+  at `~/.bluer/bin/bluer`, so "don't ask again" permission rules keep working.
+- An agent tends to mark a direct instruction ("keep it under 150 words") as a
+  rule. That is right: the gate is for situational corrections and edge cases,
+  not for rules the user states. `--always` means "a standing rule".
+
 An agent that cannot run a hook on each message gets a fallback: at the end of a
 session (or the start of the next one), the adapter scans the session log for
 lessons. This is enough for a first version of such an adapter.
@@ -395,9 +412,9 @@ Check each agent's current hook and skill support when its adapter is built.
 | Git versions, history, rollback that keeps `intent.md` | Built |
 | Link into Claude Code; never overwrite without `--replace` | Built |
 | Settings file with all four levels | Built (only `learning` and `gate` have an effect yet) |
-| Description stored in `bluer.json` | Planned |
-| Creators (built-in and external) | Planned |
-| Claude Code plugin: `/bluer` commands, capture hooks, run counting | Planned, next |
+| External creators | Planned |
+| Claude Code plugin: `bluer` skill, `/bluer:new`, `/bluer:teach`, `/bluer:status`, capture hooks (route 1), run counting | Built; tested live with `claude -p --plugin-dir` |
+| `bluer describe` (description in `bluer.json`), `bluer add-step`, creator lessons | Built |
 | Trigger tests and the test gate | Planned |
 | Size budget and rule demotion | Planned |
 | Intent drift reports | Planned |

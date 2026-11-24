@@ -13,9 +13,27 @@ questions, gets corrected, makes mistakes. bluer turns each of those into a
 lesson and folds the good ones back into the skill. Your own short version stays
 short, in your words. The skill your agent reads grows the detail.
 
-> **Status: early.** The `bluer` CLI works today (create, learn, versions,
-> rollback, adopt, link to Claude Code). It is not on npm yet. Next: a Claude Code
-> plugin that captures lessons on its own. See the [roadmap](#roadmap).
+> **Status: early.** The Claude Code plugin works: create skills in chat, and
+> your agent records what it learns while it uses them. Other agents and the npm
+> package come later. See the [roadmap](#roadmap).
+
+## Install (Claude Code)
+
+Requires [Node.js](https://nodejs.org) 20 or later. In Claude Code, run:
+
+```text
+/plugin marketplace add BulldromeQ/bluer-skills
+/plugin install bluer@bluer-skills
+```
+
+Or, on Claude Code 2.1.275 or later, in one step:
+
+```text
+/plugin install bluer --marketplace BulldromeQ/bluer-skills
+```
+
+Then just ask: *"Make a skill for my weekly update email: 1. read my notes from
+this week, 2. write a short summary, 3. email it to my team."*
 
 ## Why
 
@@ -47,8 +65,8 @@ bluer saves this as `intent.md`. It is yours, and it stays this short.
 
 | What happened | What bluer did with it |
 |---|---|
-| You said "keep it under 150 words", three times | **Rule**, added to step 2 |
-| You said "always CC my manager" | **Rule** at once, because you said "always" |
+| You said "keep it under 150 words" and "always CC my manager" | **Rules** at once, because you stated them as rules |
+| Three times you asked to put the bug fixes at the end | **Rule**, after the third time |
 | Twice you were on vacation, and the update came out empty | **Edge case**, in a side file the agent reads only when needed |
 | You said "maybe use bullet points", once | **Candidate**: it waits to see if you say it again |
 | You said "this week, leave out the offsite planning" | **One-off**: not used next week |
@@ -66,6 +84,7 @@ Do these steps in order.
 ## 2. write a short summary
 
 - Keep it under 150 words
+- Put bug fixes at the end
 
 ## 3. email it to my team
 
@@ -103,7 +122,7 @@ tier:
 
 | Tier | Where it goes | When |
 |---|---|---|
-| **Rule** | The skill itself | You said "always" or "never", it prevented a costly mistake, or it happened 3 times |
+| **Rule** | The skill itself | You stated it as a rule ("always CC my manager"), it prevented a costly mistake, or it happened 3 times |
 | **Edge case** | A side file, read only when needed | It happened twice, or it matters but is rare |
 | **Candidate** | Waits; the skill does not change | It happened once. It expires if it does not come back in 30 days or 10 runs |
 | **Ignored** | Not used | It was about this one run only |
@@ -137,15 +156,16 @@ You can make the gate `strict` or `eager`. The default is `balanced`.
 
 | Agent | Status |
 |---|---|
-| Claude Code | Skills link into `~/.claude/skills` today. Plugin with automatic capture: next |
+| Claude Code | Works: plugin with `/bluer:new`, `/bluer:teach`, `/bluer:status` and automatic lesson capture |
 | Gemini CLI | Planned |
 | OpenAI Codex | Planned |
 | Cursor | Planned |
 | GitHub Copilot | Planned |
 
-## Try it
+## Try the CLI
 
-Requires Node.js 22.18 or later, and git.
+The plugin runs the `bluer` CLI for you. To use it directly from a clone (Node.js
+22.18 or later, and git):
 
 ```bash
 git clone git@github.com:BulldromeQ/bluer-skills.git
@@ -184,6 +204,10 @@ tell a person. bluer and your agent do the rest.
 **What if it learns something wrong?** Roll back with one command, or set the
 skill to `review` so that you approve each lesson first.
 
+**Will it ask me to approve commands?** Claude Code asks before it runs the
+`bluer` command the first time. Choose "don't ask again" for
+`~/.bluer/bin/bluer`; that path stays the same across plugin updates.
+
 **Does anything leave my machine?** No. Sharing lessons with a skill's author is
 planned, and it will always show you the exact text and wait for your yes.
 
@@ -198,7 +222,7 @@ to, keeps rare cases out of the way, and versions every change.
 
 - [x] Design ([docs/design.md](docs/design.md))
 - [x] CLI core: create, learning gate, build, versions, rollback, adopt, link
-- [ ] Claude Code plugin: `/bluer` in chat, automatic lesson capture, run counting
+- [x] Claude Code plugin: `/bluer:new` in chat, automatic lesson capture, run counting
 - [ ] Trigger tests, and a test gate on every automatic change
 - [ ] Intent drift reports, size budget for skills
 - [ ] New-skill drafts for work that repeats

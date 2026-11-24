@@ -1,0 +1,12 @@
+#!/bin/sh
+# Runs the bluer CLI that ships with this plugin (bluer.mjs, built from src/
+# by "npm run build:plugin"). It needs Node.js 20 or later.
+#
+# Hooks call this script too. Without Node.js, a hook exits quietly so that it
+# never blocks a Claude Code session.
+if ! command -v node >/dev/null 2>&1; then
+  if [ "$1" = "hook" ]; then exit 0; fi
+  echo "bluer: Node.js 20 or later is needed. Install it from https://nodejs.org and try again." >&2
+  exit 1
+fi
+exec node "$(dirname "$0")/bluer.mjs" "$@"

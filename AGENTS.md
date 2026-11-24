@@ -18,8 +18,27 @@ npm install
 npm run typecheck   # tsc, no output files
 npm test            # node --test on test/**/*.test.ts
 npm run build       # compile src/ to dist/ for the npm package
+npm run build:plugin  # bundle src/ into plugins/claude-code/bin/bluer.mjs
 node src/main.ts help
 ```
+
+The Claude Code plugin ships the CLI as one bundled file,
+`plugins/claude-code/bin/bluer.mjs`, because an installed plugin gets only its
+own folder and no `node_modules`. Run `npm run build:plugin` after any change in
+`src/` and commit the bundle. CI fails when the bundle is out of date.
+
+Test the plugin by hand with Claude Code's own tools:
+
+```bash
+claude plugin validate ./plugins/claude-code
+claude plugin validate .
+BLUER_HOME=/tmp/bt/bluer BLUER_USER_HOME=/tmp/bt/user \
+  claude --plugin-dir ./plugins/claude-code
+```
+
+`BLUER_USER_HOME` moves the folder where bluer links skills for agents, so a
+test does not touch your real `~/.claude/skills`. To let a test session see a
+skill, link it into the project: `.claude/skills/<name>`.
 
 - `src/store.ts` holds the skill operations; `src/cli.ts` only parses arguments
   and prints. `src/build.ts` and `src/gate.ts` are pure functions: keep file and
@@ -28,8 +47,9 @@ node src/main.ts help
 - Use only erasable TypeScript syntax (no `enum`, no `namespace`, no parameter
   properties), because Node strips types without compiling.
 - Tests that touch files use a temp folder and set `home` and `userHome` in the
-  `Context`. The CLI reads `BLUER_HOME`, `HOME` and `BLUER_TODAY` (a fixed date
-  for tests). Never let a test write to the real `~/.bluer` or `~/.claude`.
+  `Context`. The CLI reads `BLUER_HOME`, `BLUER_USER_HOME`, `BLUER_TODAY` (a
+  fixed date for tests) and `BLUER_CLI_PATH` (the CLI path hooks write into the
+  shim). Never let a test write to the real `~/.bluer` or `~/.claude`.
 
 ## Rules
 

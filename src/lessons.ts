@@ -1,7 +1,8 @@
 import { BluerError } from "./errors.ts";
 import { normalizeKey, oneLine } from "./text.ts";
 
-export const LESSON_SOURCES = ["answer", "correction", "failure", "hand-edit"] as const;
+/** "creator": first detail written by the skill creator when the skill was made (design D26). */
+export const LESSON_SOURCES = ["answer", "correction", "failure", "hand-edit", "creator"] as const;
 export type LessonSource = (typeof LESSON_SOURCES)[number];
 
 export const IMPACTS = ["low", "medium", "high"] as const;

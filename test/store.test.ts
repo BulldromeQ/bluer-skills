@@ -209,3 +209,32 @@ describe("recordRun and listSkills", () => {
     assert.deepEqual(store.listSkills(ctx), [name]);
   });
 });
+
+describe("describeSkill and addStep", () => {
+  it("stores the agent's description and keeps it across rebuilds", () => {
+    const ctx = setup();
+    const { name } = store.createSkill(ctx, HOUSE, { link: false });
+    assert.deepEqual(store.describeSkill(ctx, name, "Cleans the house: use when the user asks for chores."), { version: 2 });
+    assert.match(skillFile(ctx, name, "SKILL.md"), /^description: "Cleans the house: use when the user asks for chores\."$/m);
+    store.learn(ctx, name, { text: "Never use bleach", explicit: true });
+    assert.match(skillFile(ctx, name, "SKILL.md"), /Cleans the house/);
+    assert.throws(() => store.describeSkill(ctx, name, "x".repeat(1025)), /at most 1024/);
+    assert.throws(() => store.describeSkill(ctx, name, "  "), /empty/);
+  });
+
+  it("appends a step in the owner's words and keeps the rest of intent.md as written", () => {
+    const ctx = setup();
+    const { name } = store.createSkill(ctx, HOUSE, { link: false });
+    appendFileSync(join(ctx.home, "skills", name, "intent.md"), "\nWe have a cat.\n");
+    assert.deepEqual(store.addStep(ctx, name, "clean the living room"), { number: 4, version: 2 });
+    const intent = skillFile(ctx, name, "intent.md");
+    assert.match(intent, /3\. clean the kitchen\n\nWe have a cat\.\n4\. clean the living room\n$/);
+    assert.match(skillFile(ctx, name, "SKILL.md"), /## 4\. clean the living room/);
+  });
+
+  it("makes creator detail a rule at once", () => {
+    const ctx = setup();
+    const { name } = store.createSkill(ctx, HOUSE, { link: false });
+    assert.equal(store.learn(ctx, name, { text: "Use the blue cloth", step: "1", source: "creator" }).tier, "rule");
+  });
+});

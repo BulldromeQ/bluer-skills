@@ -13,6 +13,8 @@ export interface BuildInput {
   intent: Intent | null;
   /** The original SKILL.md of an adopted skill, used when there is no intent. */
   base: string | null;
+  /** A description an agent wrote (bluer.json). Wins over the one bluer makes from the intent (design D27). */
+  description?: string | null;
   lessons: Lesson[];
   gate: GateLevel;
   today: string;
@@ -95,7 +97,7 @@ function renderFromIntent(input: BuildInput, intent: Intent, tiers: Record<Tier,
 
   const data = {
     name: input.name,
-    description: describe(intent),
+    description: input.description || describe(intent),
     metadata: { "built-by": "bluer-skills", version: String(input.version) },
   };
   return joinFrontmatter(data, parts.join("\n\n") + "\n");
@@ -106,6 +108,7 @@ function renderFromBase(input: BuildInput, tiers: Record<Tier, Lesson[]>): strin
   const metadata = typeof data.metadata === "object" && data.metadata !== null ? data.metadata : {};
   const merged = {
     ...data,
+    ...(input.description ? { description: input.description } : {}),
     name: input.name,
     metadata: { ...metadata, "built-by": "bluer-skills", version: String(input.version) },
   };

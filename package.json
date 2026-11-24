@@ -33,14 +33,16 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json",
     "test": "node --test \"test/**/*.test.ts\"",
-    "check": "npm run typecheck && npm test",
-    "prepack": "npm run build"
+    "check": "npm run typecheck && npm test && npm run build:plugin",
+    "prepack": "npm run build",
+    "build:plugin": "esbuild src/main.ts --bundle --platform=node --format=esm --target=node20 --legal-comments=none --log-level=warning --banner:js=\"import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\" --outfile=plugins/claude-code/bin/bluer.mjs"
   },
   "dependencies": {
     "yaml": "^2.9.1"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
+    "esbuild": "^0.28.2",
     "typescript": "^7.0.2"
   }
 }

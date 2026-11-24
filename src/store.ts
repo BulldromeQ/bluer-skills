@@ -34,6 +34,8 @@ export interface SkillMeta {
   builtHash: string;
   /** Overrides the global learning mode for this skill. */
   learning?: LearningMode;
+  /** The description an agent wrote; it decides when agents load the skill (design D27). */
+  description?: string;
 }
 
 interface Skill {
@@ -78,6 +80,7 @@ function build(ctx: Context, skill: Skill, lessons: Lesson[], version: number): 
     name: skill.name,
     intent: skill.intent,
     base: skill.base,
+    description: skill.meta.description ?? null,
     lessons,
     gate: ctx.settings.gate,
     today: ctx.today,
@@ -273,6 +276,44 @@ export function approve(ctx: Context, name: string, ids: string[] | "all"): { ap
   if (approved.length === 0) throw new BluerError(`"${name}" has no pending lessons to approve.`);
   return { approved, ...save(ctx, skill, `approved ${approved.join(", ")}`) };
 }
+
+/**
+ * Set the description agents use to decide when to load the skill. An agent
+ * writes it; a rebuild never overwrites it (design D27).
+ */
+export function describeSkill(ctx: Context, name: string, description: string): { version: number | null } {
+  const text = oneLine(description, 2000);
+  if (!text) throw new BluerError("The description is empty.");
+  if (text.length > 1024) throw new BluerError(`The description has ${text.length} characters. Agent Skills allow at most 1024.`);
+  const skill = loadSkill(ctx, name);
+  skill.meta = { ...skill.meta, description: text };
+  return save(ctx, skill, "new description");
+}
+
+/**
+ * Add a step at the end of intent.md, in the owner's words. Call this only
+ * when the owner asked for the step: automatic changes never write intent.md
+ * (design D2). The line is appended, so the rest of the file stays as written.
+ */
+export function addStep(ctx: Context, name: string, step: string): { number: number; version: number | null } {
+  const text = oneLine(step, 500);
+  if (!text) throw new BluerError("The step is empty.");
+  const skill = loadSkill(ctx, name);
+  if (!skill.intent) throw new BluerError(`"${name}" was adopted and has no intent.md yet, so it has no steps to add to.`);
+  const file = join(skill.dir, "intent.md");
+  const current = read(file);
+  const number = skill.intent.steps.length + 1;
+  writeFileSync(file, `${current.replace(/\s*$/, "")}\n${number}. ${text}\n`);
+  const updated = loadSkill(ctx, name);
+  if (updated.intent?.steps.length !== number) throw new BluerError("The new step could not be read back from intent.md. Check the file by hand.");
+  return { number, ...save(ctx, updated, `added step ${number}: ${text}`) };
+}
+
+/** Whether a skill with this name is in the bluer home. */
+export function hasSkill(ctx: Context, name: string): boolean {
+  return NAME_OK.test(name) && existsSync(join(skillsDir(ctx.home), name, "bluer.json"));
+}
+const NAME_OK = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 /** Rebuild SKILL.md, for example after the owner edited intent.md. */
 export function rebuild(ctx: Context, name: string): { version: number | null } {

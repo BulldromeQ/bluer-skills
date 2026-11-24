@@ -1,6 +1,8 @@
+import { readFileSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { parseArgs } from "node:util";
 import { claudeCode } from "./agents/claude-code.ts";
+import { handleHook, HOOK_EVENTS, type HookEvent, type HookInput } from "./agents/claude-code-hooks.ts";
 import { findAgent } from "./agents/index.ts";
 import { BluerError } from "./errors.ts";
 import { defaultHome, initHome, loadSettings } from "./home.ts";
@@ -20,20 +22,23 @@ Usage:
   bluer approve <skill> [<id>... | --all]       Approve lessons that wait for review
   bluer used <skill>                            Count one use of a skill
   bluer build <skill>                           Rebuild SKILL.md, for example after you edit intent.md
+  bluer add-step <skill> "<step>"               Add a step at the end of intent.md (only when the owner asks)
+  bluer describe <skill> "<description>"        Set when agents should load the skill (at most 1024 characters)
   bluer list                                    List your skills
   bluer status <skill>                          Show a skill's version and lessons
   bluer history <skill>                         Show a skill's versions
   bluer rollback <skill> <version>              Return a skill to an earlier version
   bluer link <skill> [--agent <id>] [--replace] Make a skill visible to an agent (default: ${claudeCode.id})
   bluer init                                    Create the bluer home (done on first use)
+  bluer hook claude-code <event>                Used by the Claude Code plugin; reads the hook JSON on stdin
 
-Skills live in $BLUER_HOME (default ~/.bluer).`;
+Skills live in $BLUER_HOME (default ~/.bluer). Agent folders are found under $BLUER_USER_HOME (default: your home folder).`;
 
 type Out = (line: string) => void;
 
 function context(env: NodeJS.ProcessEnv): store.Context {
   const home = defaultHome(env);
-  return { home, userHome: homedir(), today: env.BLUER_TODAY || todayIso(), settings: loadSettings(home) };
+  return { home, userHome: env.BLUER_USER_HOME || homedir(), today: env.BLUER_TODAY || todayIso(), settings: loadSettings(home) };
 }
 
 function need(value: string | undefined, what: string): string {
@@ -56,7 +61,12 @@ const TIER_TEXT: Record<string, string> = {
   pending: "waiting for your approval (bluer approve)",
 };
 
-export function run(argv: string[], env: NodeJS.ProcessEnv = process.env, out: Out = console.log): void {
+export function run(
+  argv: string[],
+  env: NodeJS.ProcessEnv = process.env,
+  out: Out = console.log,
+  readStdin: () => string = () => readFileSync(0, "utf8"),
+): void {
   const { values, positionals } = parseArgs({
     args: argv,
     allowPositionals: true,
@@ -77,6 +87,10 @@ export function run(argv: string[], env: NodeJS.ProcessEnv = process.env, out: O
   const [command, ...args] = positionals;
   if (!command || command === "help" || values.help) {
     out(HELP);
+    return;
+  }
+  if (command === "hook") {
+    runHook(args, env, out, readStdin);
     return;
   }
   const ctx = context(env);
@@ -130,6 +144,18 @@ export function run(argv: string[], env: NodeJS.ProcessEnv = process.env, out: O
       out(`"${name}" has been used ${store.recordRun(ctx, name).runs} times.`);
       return;
     }
+    case "add-step": {
+      const name = need(args[0], "the skill name");
+      const result = store.addStep(ctx, name, need(args.slice(1).join(" "), "the step text"));
+      out(`Added step ${result.number} to "${name}". ${result.version === null ? "SKILL.md did not change." : `SKILL.md is now v${result.version}.`}`);
+      return;
+    }
+    case "describe": {
+      const name = need(args[0], "the skill name");
+      const { version } = store.describeSkill(ctx, name, need(args.slice(1).join(" "), "the description"));
+      out(version === null ? `"${name}" already has this description.` : `New description for "${name}". SKILL.md is now v${version}.`);
+      return;
+    }
     case "build": {
       const name = need(args[0], "the skill name");
       const { version } = store.rebuild(ctx, name);
@@ -172,5 +198,26 @@ export function run(argv: string[], env: NodeJS.ProcessEnv = process.env, out: O
     }
     default:
       throw new BluerError(`Unknown command "${command}". Run "bluer help" for usage.`);
+  }
+}
+
+/**
+ * A hook must never break the user's session: any error goes to stderr, and
+ * the command still exits 0 with no output.
+ */
+function runHook(args: string[], env: NodeJS.ProcessEnv, out: Out, readStdin: () => string): void {
+  try {
+    const [agent, event] = args;
+    if (agent !== claudeCode.id) throw new BluerError(`Hooks exist only for ${claudeCode.id}.`);
+    if (!HOOK_EVENTS.includes(event as HookEvent)) throw new BluerError(`Unknown hook event "${event ?? ""}".`);
+    const raw = readStdin().trim();
+    const input = (raw ? JSON.parse(raw) : {}) as HookInput;
+    const ctx = context(env);
+    initHome(ctx.home);
+    const cliPath = env.BLUER_CLI_PATH || realpathSync(process.argv[1] ?? ".");
+    const output = handleHook(event as HookEvent, input, ctx, { cliPath });
+    if (output) out(output);
+  } catch (err) {
+    console.error(`bluer hook: ${(err as Error).message}`);
   }
 }

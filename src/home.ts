@@ -38,15 +38,22 @@ export function defaultHome(env: NodeJS.ProcessEnv = process.env): string {
 export const skillsDir = (home: string): string => join(home, "skills");
 export const backupsDir = (home: string): string => join(home, "backups");
 
+/** Folders in the home that are local to this machine and never versioned: moved-aside agent folders, the CLI shim, hook state. */
+const IGNORED = ["backups/", "bin/", "state/"];
+
 /** Create the home on first use. Safe to call each time. */
 export function initHome(home: string): { created: boolean } {
   const created = !existsSync(join(home, "settings.json"));
   mkdirSync(skillsDir(home), { recursive: true });
   ensureRepo(home);
-  if (created) {
-    writeFileSync(join(home, "settings.json"), JSON.stringify(DEFAULT_SETTINGS, null, 2) + "\n");
-    writeFileSync(join(home, ".gitignore"), "backups/\n");
-    commitPaths(home, ["settings.json", ".gitignore"], "Create the bluer home");
+  if (created) writeFileSync(join(home, "settings.json"), JSON.stringify(DEFAULT_SETTINGS, null, 2) + "\n");
+  const ignoreFile = join(home, ".gitignore");
+  const ignored = existsSync(ignoreFile) ? readFileSync(ignoreFile, "utf8") : "";
+  const missing = IGNORED.filter((line) => !ignored.split("\n").includes(line));
+  const prefix = ignored && !ignored.endsWith("\n") ? `${ignored}\n` : ignored;
+  if (missing.length > 0) writeFileSync(ignoreFile, `${prefix}${missing.join("\n")}\n`);
+  if (created || missing.length > 0) {
+    commitPaths(home, ["settings.json", ".gitignore"], created ? "Create the bluer home" : "Ignore local-only folders");
   }
   return { created };
 }
