@@ -310,11 +310,22 @@ describe("describeSkill and addStep", () => {
 });
 
 describe("linking to several agents", () => {
+  it("links an adopted skill into the agent that had the original, else into every installed agent", () => {
+    const ctx = setup();
+    mkdirSync(join(ctx.userHome, ".codex"), { recursive: true });
+    const original = join(ctx.userHome, ".agents", "skills", "pdf-report");
+    mkdirSync(original, { recursive: true });
+    writeFileSync(join(original, "SKILL.md"), "---\nname: pdf-report\ndescription: Makes a PDF report.\n---\n\n# PDF report\n");
+    store.adoptSkill(ctx, original);
+    assert.deepEqual(store.linkTargets(ctx, "pdf-report").map((a) => a.id), ["codex"]);
+    assert.deepEqual(store.linkTargets(ctx, "no-such-skill").map((a) => a.id), ["claude-code", "codex"]);
+  });
+
   it("links once per skills folder, into each installed agent", () => {
     const ctx = setup();
-    mkdirSync(join(ctx.userHome, ".gemini"), { recursive: true });
+    mkdirSync(join(ctx.userHome, ".codex"), { recursive: true });
     const made = store.createSkill(ctx, HOUSE);
-    assert.deepEqual(made.links.map((l) => [l.agent.id, l.result]), [["claude-code", "linked"], ["gemini-cli", "linked"]]);
+    assert.deepEqual(made.links.map((l) => [l.agent.id, l.result]), [["claude-code", "linked"], ["codex", "linked"]]);
     assert.ok(lstatSync(join(ctx.userHome, ".agents", "skills", made.name)).isSymbolicLink());
   });
 });

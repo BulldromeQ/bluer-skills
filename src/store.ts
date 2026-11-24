@@ -501,6 +501,23 @@ export function listSkills(ctx: Context): string[] {
     .sort();
 }
 
+/**
+ * The agents to link a skill into when the user names none: each installed
+ * agent whose skills folder already has an entry with this name (the original
+ * of an adopted skill), else every installed agent. One agent per folder.
+ */
+export function linkTargets(ctx: Context, name: string): AgentAdapter[] {
+  const seen = new Set<string>();
+  const installed = AGENTS.filter((a) => {
+    const folder = a.skillsDir(ctx.userHome);
+    if (!a.isInstalled(ctx.userHome) || seen.has(folder)) return false;
+    seen.add(folder);
+    return true;
+  });
+  const holding = installed.filter((a) => existsSync(join(a.skillsDir(ctx.userHome), name)));
+  return holding.length > 0 ? holding : installed;
+}
+
 export function link(ctx: Context, name: string, agent: AgentAdapter, replace: boolean): LinkResult {
   const skill = loadSkill(ctx, name);
   return linkSkill(agent, { userHome: ctx.userHome, skillDir: skill.dir, name, backupsDir: backupsDir(ctx.home), replace });

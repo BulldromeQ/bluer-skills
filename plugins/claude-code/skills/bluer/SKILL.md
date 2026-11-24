@@ -5,14 +5,15 @@ description: >-
   as a few plain steps; bluer builds the detailed skill and records what the
   agent learns while it uses it. Use when the user wants to turn steps into a
   skill, add a step to a skill, teach a skill something, see what a skill has
-  learned, undo what it learned, change how it learns, or bring an existing
-  skill into bluer.
+  learned, undo what it learned, change how it learns, or bring a skill they
+  already have into bluer.
 when_to_use: >-
   "make a skill for my weekly update", "turn these steps into a skill",
   "create a skill that does X, 1. ... 2. ...", "add a step to my skill",
   "remember this for my skill", "what has my skill learned", "undo that",
-  "forget that lesson", "roll back my skill", "stop my skill from learning", "adopt this
-  skill into bluer", "bluer".
+  "forget that lesson", "roll back my skill", "stop my skill from learning",
+  "bring my pdf-report skill into bluer", "make my existing skills learn",
+  "adopt this skill into bluer", "bluer".
 ---
 
 # bluer
@@ -145,6 +146,14 @@ Change these only when the user asks.
 
 ## Bring in an existing skill
 
-Run `bluer adopt <folder>`. The original stays unchanged as version 0. If the
-user wants agents to use the bluer copy, ask first, then run
-`bluer link <name> --replace`. That moves the old folder to `~/.bluer/backups`.
+1. Find the skill's folder. Personal skills live in `~/.claude/skills/<name>`
+   (Claude Code) or `~/.agents/skills/<name>` (Codex, and other agents). If
+   you cannot tell which skill the user means, list the folders and ask.
+2. Run `bluer adopt <folder>`. It copies the skill; the original stays
+   unchanged as version 0.
+3. Ask the user before you swap it in, then run `bluer link <name> --replace`.
+   It puts the bluer copy in place of the original, in each agent that had it,
+   and moves the original folder to `~/.bluer/backups`.
+4. Tell the user that the skill now learns, and that its text is unchanged.
+
+Skills that a plugin installed cannot be adopted yet.

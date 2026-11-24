@@ -1,7 +1,7 @@
 # <img src="plugins/claude-code/.claude-plugin/icon.png" alt="" width="44"> bluer
 
 **bluer skills: agent skills you write in three lines, that get better every time they run.**
-For Claude Code, Gemini CLI and OpenAI Codex.
+For Claude Code and OpenAI Codex.
 
 [![CI](https://github.com/BulldromeQ/bluer-skills/actions/workflows/ci.yml/badge.svg)](https://github.com/BulldromeQ/bluer-skills/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -16,6 +16,9 @@ questions, gets corrected, makes mistakes. bluer turns each of those into a
 lesson and folds the good ones back into the skill. Your own short version stays
 short, in your words. The skill your agent reads grows the detail.
 
+It works for the skills you already have, too: bring one into bluer, and it
+starts to learn without losing what it says today.
+
 **You see every change, and one sentence undoes it.** Each time a skill learns
 something, your agent tells you in one line:
 
@@ -26,17 +29,16 @@ weekly-update learned: "keep it under 150 words". It does this every time now. S
 bluer never changes your own steps, and every change is a version you can roll
 back.
 
-> **Status: early.** It works in Claude Code and Gemini CLI. The OpenAI Codex
-> plugin is new and not yet tested in live sessions. See the [roadmap](#roadmap).
+> **Status: early.** It works in Claude Code. The OpenAI Codex plugin is new and
+> not yet tested in live sessions. See the [roadmap](#roadmap).
 
 ## Get started
 
 | Your agent | Status | Install |
 |---|---|---|
 | Claude Code | Works | [Steps](#claude-code) |
-| Gemini CLI | Works | [Steps](#gemini-cli) |
 | OpenAI Codex | New, live test pending | [Steps](#openai-codex) |
-| Google Antigravity, Cursor, GitHub Copilot, others | Open to contributors | [Add an agent](docs/adding-an-agent.md) |
+| Google Antigravity, Gemini CLI, Cursor, GitHub Copilot, others | Open to contributors | [Add an agent](docs/adding-an-agent.md) |
 
 You do not need to install anything else first. bluer runs on
 [Node.js](https://nodejs.org). If your computer does not have it, bluer tells
@@ -61,25 +63,6 @@ bluer only.
 4. **Use it.** Ask for the task ("write my weekly update"), or type
    `/weekly-update-email`. Correct it the way you would correct a person.
 
-### Gemini CLI
-
-1. **Install.** In a terminal, run:
-
-   ```bash
-   gemini extensions install https://github.com/BulldromeQ/bluer-skills
-   ```
-
-2. **Start Gemini CLI** and ask: *"Make a skill for my weekly update email:
-   1. read my notes from this week, 2. write a short summary, 3. email it to my
-   team."*
-3. **Allow bluer once.** Gemini CLI asks before it runs the `bluer` command.
-   Choose **"Allow for all future sessions"**.
-4. **Use it.** Ask for the task, or type `/weekly-update-email`.
-
-Google is moving Gemini CLI users to Antigravity CLI. Gemini CLI support stays
-for the accounts that still have it. Antigravity reads the same skills folder,
-and an Antigravity adapter is open to contributors.
-
 ### OpenAI Codex
 
 1. **Install.** In a terminal, run:
@@ -99,6 +82,21 @@ and an Antigravity adapter is open to contributors.
    choose **"Yes, and don't ask again for commands that start with …"**.
 5. **Use it.** Ask for the task, or type `$weekly-update-email`.
 
+### Bring in skills you already have
+
+bluer does not only make new skills. It can take over a skill you already use,
+and that skill starts to learn too:
+
+1. **Ask:** *"Bring my pdf-report skill into bluer."* Your agent runs
+   `bluer adopt`. It copies the skill, and keeps its text unchanged as version 0.
+2. **Say yes to the swap.** Your agent asks before it puts the bluer copy in
+   place of the original. bluer moves the original folder to `~/.bluer/backups`,
+   so nothing is lost.
+3. **Use it as before.** Its lessons now go on top of the original text, with
+   the same receipts and undo as a new skill.
+
+Skills that came with a plugin cannot be brought in yet.
+
 ### Everyday use
 
 Talk to your agent. This works the same in every agent:
@@ -106,6 +104,7 @@ Talk to your agent. This works the same in every agent:
 | To do this | Say this | Or type |
 |---|---|---|
 | Make a skill | "Make a skill for my weekly update: 1. ..., 2. ..., 3. ..." | `/bluer:new` |
+| Bring in a skill you already have | "Bring my pdf-report skill into bluer" | |
 | Use a skill | "Write my weekly update" | `/weekly-update-email` |
 | Teach it | Correct it, the way you would correct a person ("keep it under 150 words") | `/bluer:teach` |
 | See what it learned | "What has my weekly update skill learned?" | `/bluer:status` |
@@ -280,8 +279,8 @@ bluer history weekly-update
 ```
 
 `bluer new` links the skill into the skills folder of each agent you have
-(`~/.claude/skills` for Claude Code, `~/.agents/skills` for Gemini CLI), so the
-agent can use it at once. Add `--no-link` to skip that.
+(`~/.claude/skills` for Claude Code, `~/.agents/skills` for Codex), so the agent
+can use it at once. Add `--no-link` to skip that.
 
 | Command | What it does |
 |---|---|
@@ -293,8 +292,7 @@ agent can use it at once. Add `--no-link` to skip that.
 | `bluer forget <skill> --last` / `bluer restore <skill> <id>` | Undo a lesson, or bring it back |
 | `bluer approve <skill> --all` | Approve lessons that wait for review |
 | `bluer learning <skill> review` | Make a skill ask before it uses a new lesson (`auto`, `review` or `off`; `--all` for every skill) |
-| `bluer adopt <folder>` | Bring an existing skill into bluer |
-| `bluer link <skill> --replace` | Swap an agent's copy of a skill for the bluer one |
+| `bluer adopt <folder>` then `bluer link <skill> --replace` | Bring in a skill you already have, and make your agent use the bluer copy |
 
 Run `bluer help` for every option.
 
@@ -309,8 +307,7 @@ before it is used, set the skill to `review`.
 
 **Will it ask me to approve commands?** Your agent asks before it runs the
 `bluer` command the first time. In Claude Code, choose "don't ask again" for
-`~/.bluer/bin/bluer`. In Gemini CLI, choose "Allow for all future sessions". In
-Codex, choose "Yes, and don't ask again for commands that start with …". That
+`~/.bluer/bin/bluer`. In Codex, choose "Yes, and don't ask again for commands that start with …". That
 path stays the same across updates.
 
 **My agent says bluer needs Node.js. What do I do?** Say "set up bluer". Your
@@ -349,7 +346,6 @@ to, keeps rare cases out of the way, and versions every change.
 - [ ] Intent drift reports, size budget for skills
 - [ ] New-skill drafts for work that repeats
 - [ ] Shared skills with a personal layer
-- [x] Gemini CLI extension
 - [x] OpenAI Codex plugin (live test pending)
 - Other agents: open to contributors ([how to add one](docs/adding-an-agent.md))
 

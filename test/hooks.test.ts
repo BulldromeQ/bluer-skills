@@ -7,7 +7,6 @@ import { join } from "node:path";
 import { after, describe, it } from "node:test";
 import { claudeCode } from "../src/agents/claude-code.ts";
 import { codex } from "../src/agents/codex.ts";
-import { geminiCli } from "../src/agents/gemini-cli.ts";
 import { handleHook, installShim, lastAssistantAsked, pruneState, shimPath, type HookEvent } from "../src/agents/hooks.ts";
 import type { AgentAdapter } from "../src/agents/types.ts";
 import { run } from "../src/cli.ts";
@@ -183,7 +182,7 @@ describe("bluer hook (CLI)", () => {
     const env = { BLUER_HOME: ctx.home, BLUER_CLI_PATH: CLI };
     run(["hook", "claude-code", "post-tool-use"], env, (l) => out.push(l), () => "not json");
     run(["hook", "claude-code", "no-such-event"], env, (l) => out.push(l), () => "{}");
-    run(["hook", "gemini", "session-start"], env, (l) => out.push(l), () => "{}");
+    run(["hook", "no-such-agent", "session-start"], env, (l) => out.push(l), () => "{}");
     assert.deepEqual(out, []);
   });
 
@@ -227,8 +226,8 @@ describe("plugin bin/bluer", () => {
     assert.equal(out.hookSpecificOutput.hookEventName, "SessionStart");
     assert.match(out.hookSpecificOutput.additionalContext, /^bluer cannot run in this session\. .*tell them this first\. .*: sh "[^"]+\/bin\/bluer" setup\. Then tell the user to restart Claude Code\.$/);
 
-    const gemini = JSON.parse(runBin(env, ["hook", "gemini-cli", "session-start"]).stdout) as { systemMessage: string };
-    assert.match(gemini.systemMessage, /Then restart Gemini CLI\.$/);
+    const forCodex = JSON.parse(runBin(env, ["hook", "codex", "session-start"]).stdout) as { systemMessage: string };
+    assert.match(forCodex.systemMessage, /Then restart Codex\.$/);
 
     const prompt = runBin(env, ["hook", "claude-code", "user-prompt-submit"]);
     assert.deepEqual([prompt.status, prompt.stdout, prompt.stderr], [0, "", ""]);
@@ -312,51 +311,11 @@ describe("plugin bin/bluer", () => {
   });
 });
 
-describe("Gemini CLI dialect", () => {
-  it("counts a run when activate_skill loads a bluer skill, and answers as AfterTool", () => {
-    const { ctx } = setup();
-    const out = contextOf(hook(ctx, "post-tool-use", { session_id: "g1", tool_name: "activate_skill", tool_input: { name: "weekly-update" } }, geminiCli));
-    assert.equal(out.hookEventName, "AfterTool");
-    assert.match(out.additionalContext, /"weekly-update" is a bluer skill/);
-    assert.doesNotMatch(out.additionalContext, /[<>]/, "Gemini escapes angle brackets, so the text must not use them");
-    assert.equal(runs(ctx), 1);
-    assert.ok(existsSync(join(ctx.home, "state", "gemini-cli", "g1.json")));
-  });
-
-  it("ignores Claude Code's Skill tool and treats only \"bluer\" as its own skill", () => {
-    const { ctx } = setup();
-    assert.equal(hook(ctx, "post-tool-use", { session_id: "g1", tool_name: "Skill", tool_input: { skill: "weekly-update" } }, geminiCli), "");
-    assert.equal(hook(ctx, "post-tool-use", { session_id: "g1", tool_name: "activate_skill", tool_input: { name: "bluer:bluer" } }, geminiCli), "");
-    const own = contextOf(hook(ctx, "post-tool-use", { session_id: "g1", tool_name: "activate_skill", tool_input: { name: "bluer" } }, geminiCli));
-    assert.match(own.additionalContext, /run the bluer CLI as/);
-  });
-
-  it("reminds the agent on BeforeAgent, and leaves slashes to activate_skill", () => {
-    const { ctx } = setup();
-    assert.equal(hook(ctx, "user-prompt-submit", { session_id: "g1", prompt: "/weekly-update" }, geminiCli), "");
-    assert.equal(runs(ctx), 0);
-    hook(ctx, "post-tool-use", { session_id: "g1", tool_name: "activate_skill", tool_input: { name: "weekly-update" } }, geminiCli);
-    const out = contextOf(hook(ctx, "user-prompt-submit", { session_id: "g1", prompt: "No, shorter" }, geminiCli));
-    assert.equal(out.hookEventName, "BeforeAgent");
-  });
-
+describe("several agents", () => {
   it("keeps each agent's sessions apart", () => {
     const { ctx } = setup();
-    hook(ctx, "post-tool-use", { session_id: "same", tool_name: "activate_skill", tool_input: { name: "weekly-update" } }, geminiCli);
+    hook(ctx, "post-tool-use", { session_id: "same", tool_name: "Bash", tool_input: { command: "cat r0/weekly-update/SKILL.md" } }, codex);
     assert.equal(hook(ctx, "user-prompt-submit", { session_id: "same", prompt: "No, shorter" }, claudeCode), "");
-  });
-
-  it("reads a question from a Gemini CLI transcript", () => {
-    const { root } = setup();
-    const file = join(root, "gemini.jsonl");
-    const lines = [
-      { sessionId: "g1", kind: "main" },
-      { id: "1", type: "user", content: [{ text: "write my weekly update" }] },
-      { id: "2", type: "gemini", content: "Who should get the update?" },
-      { $set: { lastUpdated: "2026-11-24" } },
-    ];
-    writeFileSync(file, lines.map((l) => JSON.stringify(l)).join("\n") + "\n");
-    assert.equal(lastAssistantAsked(file), true);
   });
 });
 

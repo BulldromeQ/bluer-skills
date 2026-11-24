@@ -1,7 +1,6 @@
 import { readFileSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { parseArgs } from "node:util";
-import { claudeCode } from "./agents/claude-code.ts";
 import { handleHook, HOOK_EVENTS, type HookEvent, type HookInput } from "./agents/hooks.ts";
 import { findAgent } from "./agents/index.ts";
 import { BluerError } from "./errors.ts";
@@ -31,9 +30,10 @@ Usage:
   bluer status <skill>                          Show a skill's version and lessons
   bluer history <skill>                         Show a skill's versions
   bluer rollback <skill> <version>              Return a skill to an earlier version
-  bluer link <skill> [--agent <id>] [--replace] Make a skill visible to an agent (default: ${claudeCode.id})
+  bluer link <skill> [--agent <id>] [--replace] Make a skill visible to agents (default: the agents that have a
+                                                skill with this name, else every installed agent)
   bluer init                                    Create the bluer home (done on first use)
-  bluer hook <agent> <event>                    Used by agent plugins (claude-code, gemini-cli); reads the hook JSON on stdin
+  bluer hook <agent> <event>                    Used by agent plugins (claude-code, codex); reads the hook JSON on stdin
 
 Skills live in $BLUER_HOME (default ~/.bluer). Agent folders are found under $BLUER_USER_HOME (default: your home folder).`;
 
@@ -252,10 +252,10 @@ export function run(
     }
     case "link": {
       const name = need(args[0], "the skill name");
-      const agent = findAgent(values.agent ?? claudeCode.id);
-      const result = store.link(ctx, name, agent, Boolean(values.replace));
+      const agents = values.agent ? [findAgent(values.agent)] : store.linkTargets(ctx, name);
+      if (agents.length === 0) throw new BluerError("No agent is installed. Give one with --agent claude-code or --agent codex.");
       const text = { linked: "can now use it", "already-linked": "already uses it", replaced: "now uses the bluer version; the old folder is in the bluer backups" };
-      out(`${agent.displayName} ${text[result]}.`);
+      for (const agent of agents) out(`${agent.displayName} ${text[store.link(ctx, name, agent, Boolean(values.replace))]}.`);
       return;
     }
     default:

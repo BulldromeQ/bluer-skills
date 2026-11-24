@@ -378,14 +378,14 @@ layer. Section 12 explains why this case is still open.
 
 Each agent gets one adapter. An adapter provides:
 
-| Capability | What it does | Claude Code | Gemini CLI | OpenAI Codex |
-|---|---|---|---|---|
-| Skill folder | Where the agent reads personal skills; bluer links skills there | `~/.claude/skills/<name>`; symlinks work | `~/.agents/skills/<name>`; symlinks work | `~/.agents/skills/<name>`; folder symlinks work |
-| Chat entry | Commands the user types in chat | A plugin with a `/bluer` skill | An extension with the `bluer` skill and TOML commands | The Claude Code plugin, through `.codex-plugin/plugin.json` |
-| Skill-in-use signal | Which skill is loaded, to count runs and route lessons | `PostToolUse` hook on the `Skill` tool | `AfterTool` hook on the `activate_skill` tool | `PostToolUse` on `Bash` that reads a `SKILL.md`; `$<skill>` in the prompt |
-| Message capture | The user's messages, to find answers and corrections | `UserPromptSubmit` hook | `BeforeAgent` hook | `UserPromptSubmit` hook |
-| Session end | When to run the batch (gate, drift, tests) | `Stop` / `SessionEnd` hooks | `SessionEnd` hook | `SessionEnd` hook (at most 3 s) |
-| Headless run | Runs trigger tests | `claude -p --output-format stream-json` | `gemini -p -o stream-json` | `codex exec --json`, `codex exec resume --last` |
+| Capability | What it does | Claude Code | OpenAI Codex |
+|---|---|---|---|
+| Skill folder | Where the agent reads personal skills; bluer links skills there | `~/.claude/skills/<name>`; symlinks work | `~/.agents/skills/<name>`; folder symlinks work |
+| Chat entry | Commands the user types in chat | A plugin with a `/bluer` skill | The Claude Code plugin, through `.codex-plugin/plugin.json` |
+| Skill-in-use signal | Which skill is loaded, to count runs and route lessons | `PostToolUse` hook on the `Skill` tool | `PostToolUse` on `Bash` that reads a `SKILL.md`; `$<skill>` in the prompt |
+| Message capture | The user's messages, to find answers and corrections | `UserPromptSubmit` hook | `UserPromptSubmit` hook |
+| Session end | When to run the batch (gate, drift, tests) | `Stop` / `SessionEnd` hooks | `SessionEnd` hook (at most 3 s) |
+| Headless run | Runs trigger tests | `claude -p --output-format stream-json` | `codex exec --json`, `codex exec resume --last` |
 
 The hook logic is shared (`src/agents/hooks.ts`). Each adapter gives a small
 dialect: its event names, its skill tool and the input field that names the
@@ -406,32 +406,15 @@ Findings from the Claude Code adapter:
   at `~/.bluer/bin/bluer`, so "don't ask again" permission rules keep working.
 - A hook can show text to the user with `systemMessage`. When Node.js is missing
   or older than 20, the `bin/bluer` wrapper (plain `sh`) prints that JSON itself
-  at `SessionStart`, so the user learns how to fix it. Gemini CLI supports the
-  same field.
+  at `SessionStart`, so the user learns how to fix it. Codex supports the same
+  field.
 - An agent tends to mark a direct instruction ("keep it under 150 words") as a
   rule. That is right: the gate is for situational corrections and edge cases,
   not for rules the user states. `--always` means "a standing rule".
 
-Findings from the Gemini CLI adapter (Gemini CLI 0.68):
-
-- Gemini CLI installs an extension only from the root of a repository, so
-  `gemini-extension.json`, `hooks/`, `commands/` and `skills/` sit at the repo
-  root. The hooks run the same bundled CLI as the Claude Code plugin, through
-  `${extensionPath}/plugins/claude-code/bin/bluer`.
-- `${extensionPath}` is replaced in the manifest and in `hooks/hooks.json`, but
-  not in a skill body. The extension's `skills/bluer/SKILL.md` is generated from
-  the Claude Code skill by `scripts/build-gemini-extension.ts` and uses the
-  stable shim `~/.bluer/bin/bluer`.
-- Gemini CLI reads both `~/.gemini/skills` and `~/.agents/skills`. bluer links
-  into `~/.agents/skills`, which other agents also read.
-- A typed `/<skill>` also calls `activate_skill`, so the `AfterTool` hook counts
-  every run and the prompt hook does not need to catch the slash.
-- Gemini CLI escapes `<` and `>` in hook context, so the hook notes do not use
-  angle brackets.
-- The session log is JSONL. Model lines have `type: "gemini"` and the text in a
-  top-level `content` field, not in `message.content` as in Claude Code.
-- An extension cannot pre-approve a shell command. The user approves the
-  `bluer` command once ("Allow for all future sessions").
+A Gemini CLI adapter shipped until commit `d802c60`, and was removed (D32). Its
+findings are in [adding-an-agent.md](adding-an-agent.md), for whoever adds
+Google Antigravity.
 
 Findings from the OpenAI Codex adapter (Codex 0.166, read from its source):
 
@@ -457,8 +440,8 @@ An agent that cannot run a hook on each message gets a fallback: at the end of a
 session (or the start of the next one), the adapter scans the session log for
 lessons. This is enough for a first version of such an adapter.
 
-Order: Claude Code, Gemini CLI, then OpenAI Codex. Other agents are open to
-contributors; [adding-an-agent.md](adding-an-agent.md) says how.
+Order: Claude Code, then OpenAI Codex. Other agents are open to contributors;
+[adding-an-agent.md](adding-an-agent.md) says how.
 Check each agent's current hook and skill support when its adapter is built.
 
 ## 10. Status
@@ -470,15 +453,15 @@ Check each agent's current hook and skill support when its adapter is built.
 | Learning gate with levels, candidate expiry by days and runs | Built |
 | Build in intent mode and base mode; edge-case file | Built |
 | Lessons follow steps by text; archive and restore with the step | Built |
-| Lesson receipts, `bluer forget` (`--last`) and `bluer restore`; `status` lists each lesson | Built; tested live in Claude Code and Gemini CLI |
+| Lesson receipts, `bluer forget` (`--last`) and `bluer restore`; `status` lists each lesson | Built; tested live in Claude Code |
 | Learning eval (`evals/learning`): 23 two-turn cases with real agents | Built; Claude Code (Sonnet) 23/23 |
 | Lessons listed with ids in the hook notes; `bluer learn <skill> L2` counts a repeat | Built |
-| Session-start message when Node.js is missing or too old; `BLUER_NODE` | Built; tested live in Claude Code and Gemini CLI |
+| Session-start message when Node.js is missing or too old; `BLUER_NODE` | Built; tested live in Claude Code |
 | `bluer setup`: a private Node.js from nodejs.org, pinned by checksum | Built; tested live in Claude Code |
 | Windows | Planned (hooks need `sh`) |
 | Hand-edit detection and saving | Built |
 | Git versions, history, rollback that keeps `intent.md` | Built |
-| Link into each installed agent's skills folder; never overwrite without `--replace` | Built |
+| Link into each installed agent's skills folder (for an adopted skill, the agents that had it); never overwrite without `--replace` | Built |
 | Settings file with all four levels | Built (only `learning` and `gate` have an effect yet) |
 | External creators | Planned |
 | Claude Code plugin: `bluer` skill, `/bluer:new`, `/bluer:teach`, `/bluer:status`, capture hooks (route 1), run counting | Built; tested live with `claude -p --plugin-dir` |
@@ -489,7 +472,7 @@ Check each agent's current hook and skill support when its adapter is built.
 | Routes 2–4 (missed triggers, new-skill drafts, personal profile) | Planned |
 | Shared skills, `upstream/`, `intent.local.md`, sharing levels | Planned |
 | Secret removal in lessons | Planned |
-| Gemini CLI extension: `bluer` skill, `/bluer:new`, `/bluer:teach`, `/bluer:status`, capture hooks, run counting | Built; tested live with `gemini -p` |
+| Gemini CLI extension | Removed (D32) |
 | OpenAI Codex adapter: same plugin, Codex manifest and hooks, `$<skill>` | Built; packaging and skills list checked in Codex; live sessions not yet tested |
 | Adapters for other agents (Antigravity, Cursor, Copilot) | Open to contributors |
 
@@ -529,7 +512,8 @@ IDs are stable: other documents and commits refer to them.
 | D28 | Each lesson gets a one-line receipt that the agent shows word for word; "undo that" forgets the last lesson, and a forgotten lesson stays forgotten. | Users fear "the agent changed my skill". Seeing every change, and undoing it in one sentence, builds more trust than history and rollback alone. |
 | D29 | Users without Node.js get a private copy: `bin/bluer setup` downloads the official release pinned by checksum into `~/.bluer/runtime`, after the user says yes. | Many agents install without Node.js. Official files beat our own binaries for trust, and a ~30 MB download beats a ~100 MB binary per OS and a release pipeline. |
 | D30 | While a bluer skill is in use, the hooks give the agent a note on every user message, with the skill's lessons and their ids; a repeat is recorded by id. | The learning eval showed both gaps: a word list ("never", "always") missed plain corrections such as "move the bug fixes to the end", and an agent rewords a repeat, which bluer then counted as a new lesson. |
-| D31 | The project builds adapters for Claude Code, Gemini CLI and OpenAI Codex only; other agents are left to contributors, with a guide. | A small team keeps three adapters working well; the adapter interface and the learning eval let others add more. |
+| D31 | The project builds adapters for Claude Code and OpenAI Codex only; other agents are left to contributors, with a guide. | A small team keeps three adapters working well; the adapter interface and the learning eval let others add more. |
+| D32 | Remove the Gemini CLI adapter. | Google moved Gemini CLI users to Antigravity CLI. Its findings stay in adding-an-agent.md, for an Antigravity adapter. |
 
 ## 12. Open questions
 

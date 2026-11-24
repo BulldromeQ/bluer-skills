@@ -18,7 +18,7 @@ npm install
 npm run typecheck   # tsc, no output files
 npm test            # node --test on test/**/*.test.ts
 npm run build       # compile src/ to dist/ for the npm package
-npm run build:plugin  # bundle src/ into plugins/claude-code/bin/bluer.mjs, generate skills/bluer/SKILL.md
+npm run build:plugin  # bundle src/ into plugins/claude-code/bin/bluer.mjs
 node src/main.ts help
 ```
 
@@ -32,24 +32,12 @@ own folder and no `node_modules`. Run `npm run build:plugin` after any change in
 run `node scripts/pin-node.ts`, check the diff and commit it. Never edit the
 checksums by hand: they are what makes the download safe.
 
-The Gemini CLI extension lives at the repo root, because Gemini CLI installs an
-extension only from a repository root: `gemini-extension.json`,
-`hooks/hooks.json`, `commands/bluer/*.toml` and `skills/bluer/SKILL.md`. Its
-hooks run the same bundle. `skills/bluer/SKILL.md` is generated from
-`plugins/claude-code/skills/bluer/SKILL.md` by `scripts/build-gemini-extension.ts`
-(part of `npm run build:plugin`). Edit the Claude Code skill, never the generated
-copy. CI fails when the copy is out of date.
-
 OpenAI Codex installs the same plugin. It reads
 `plugins/claude-code/.codex-plugin/plugin.json` (before `.claude-plugin/`),
 which points it to `hooks/codex-hooks.json`. Keep the two hook files in step.
 To check what Codex sees without a model call, use a scratch home:
 `CODEX_HOME=/tmp/cx/.codex HOME=/tmp/cx codex plugin marketplace add .`, then
 `codex plugin add bluer@bluer-skills` and `codex debug prompt-input "hi"`.
-
-`claude plugin validate .` warns that `BeforeAgent` and `AfterTool` in
-`hooks/hooks.json` are unknown events. Ignore it: that file is for Gemini CLI,
-and the Claude Code marketplace installs only `plugins/claude-code`.
 
 Test the plugin by hand with Claude Code's own tools:
 
@@ -58,15 +46,6 @@ claude plugin validate ./plugins/claude-code
 claude plugin validate .
 BLUER_HOME=/tmp/bt/bluer BLUER_USER_HOME=/tmp/bt/user \
   claude --plugin-dir ./plugins/claude-code
-```
-
-Test the extension by hand with a scratch home, so that nothing touches your
-real `~/.gemini`:
-
-```bash
-export GEMINI_CLI_HOME=/tmp/gt BLUER_HOME=/tmp/gt/bluer BLUER_USER_HOME=/tmp/gt
-gemini extensions link .
-gemini
 ```
 
 `evals/learning` runs real agent sessions to check what the agent records; see
@@ -100,7 +79,7 @@ skill, link it into the project: `.claude/skills/<name>`.
   shim). The wrapper `plugins/claude-code/bin/bluer` reads `BLUER_NODE` (set
   it to a missing path to test what users without Node.js see) and
   `BLUER_NODE_MIRROR` (where `setup` downloads from; tests use a `file://`
-  mirror). Never let a test write to the real `~/.bluer`, `~/.claude` or `~/.gemini`.
+  mirror). Never let a test write to the real `~/.bluer`, `~/.claude` or `~/.codex`.
 
 ## Rules
 

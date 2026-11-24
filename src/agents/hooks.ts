@@ -109,7 +109,7 @@ export function lastAssistantAsked(transcriptPath: string | undefined): boolean 
   const tail = readTail(transcriptPath, 256 * 1024);
   const lines = tail.split("\n");
   for (let i = lines.length - 1; i >= 0; i--) {
-    // Claude Code: { type: "assistant", message: { content } }. Gemini CLI: { type: "gemini", content }.
+    // Claude Code: { type: "assistant", message: { content } }.
     // Codex: { type: "response_item", payload: { type: "message", role: "assistant", content } }.
     let entry: { type?: string; content?: unknown; message?: { content?: unknown }; payload?: { type?: string; role?: string; content?: unknown } };
     try {
@@ -118,9 +118,9 @@ export function lastAssistantAsked(transcriptPath: string | undefined): boolean 
       continue;
     }
     const codexReply = entry.type === "response_item" && entry.payload?.type === "message" && entry.payload.role === "assistant";
-    if (entry.type !== "assistant" && entry.type !== "gemini" && !codexReply) continue;
+    if (entry.type !== "assistant" && !codexReply) continue;
     const content = codexReply ? entry.payload?.content : (entry.message?.content ?? entry.content);
-    // Claude Code: [{ type: "text", text }]. Gemini CLI: a string, or [{ text }]. Codex: [{ type: "output_text", text }].
+    // Claude Code: [{ type: "text", text }], or a string. Codex: [{ type: "output_text", text }].
     const texts = Array.isArray(content)
       ? content.flatMap((b: { type?: string; text?: unknown }) =>
           (b?.type === "text" || b?.type === "output_text" || b?.type === undefined) && typeof b?.text === "string" ? [b.text] : [],
@@ -147,7 +147,7 @@ function readTail(path: string, bytes: number): string {
   }
 }
 
-// No angle brackets in these texts: Gemini CLI escapes "<" and ">" in hook context.
+// No angle brackets in these texts: some agents escape "<" and ">" in hook context.
 const LEARN_USAGE = (cli: string, name: string): string =>
   `${cli} learn ${name} "LESSON" [--step N] [--source answer|correction|failure] [--always] [--one-off] [--impact medium|high], where LESSON is short and in the user's words`;
 

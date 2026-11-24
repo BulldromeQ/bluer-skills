@@ -2,11 +2,10 @@
 // real agent, and the case checks what bluer recorded. See evals/README.md.
 //
 //   node evals/learning/run.ts --agent claude-code [--model sonnet]
-//   node evals/learning/run.ts --agent gemini-cli [--model gemini-2.5-flash]
 //   options: --cases id,id  --jobs 4  --keep  --summary
 //
 // Each case gets its own scratch folder, so the run never touches your real
-// ~/.bluer, ~/.claude or ~/.gemini. Claude Code runs with
+// ~/.bluer or ~/.claude. Claude Code runs with
 // --setting-sources project,local, so your own settings, plugins and
 // instructions stay out of the session.
 import { spawn, spawnSync } from "node:child_process";
@@ -81,7 +80,8 @@ const { values } = parseArgs({
   },
 });
 const agent = values.agent ?? "claude-code";
-if (agent !== "claude-code" && agent !== "gemini-cli") throw new Error(`--agent must be claude-code or gemini-cli, not ${agent}.`);
+// To add an agent: set up its home in prepare() and run one turn in turn(). See docs/adding-an-agent.md.
+if (agent !== "claude-code") throw new Error(`The eval runs only claude-code so far, not ${agent}. See docs/adding-an-agent.md to add an agent.`);
 
 const spec = parseYaml(readFileSync(join(import.meta.dirname, "cases.yaml"), "utf8")) as { skills: Record<string, SkillFixture>; cases: Case[] };
 const wanted = values.cases?.split(",").map((s) => s.trim());
@@ -132,61 +132,23 @@ function prepare(c: Case, dir: string): { env: NodeJS.ProcessEnv; proj: string; 
 
   const skillDir = join(home, "skills", c.skill);
   const seeds = new Map(parseLearnings(readFileSync(join(skillDir, "learnings.md"), "utf8")).map((l) => [l.id, l] as const));
-  if (agent === "claude-code") {
-    mkdirSync(join(proj, ".claude", "skills"), { recursive: true });
-    symlinkSync(skillDir, join(proj, ".claude", "skills", c.skill));
-  } else {
-    env.GEMINI_CLI_HOME = user;
-    mkdirSync(join(user, ".agents", "skills"), { recursive: true });
-    symlinkSync(skillDir, join(user, ".agents", "skills", c.skill));
-    mkdirSync(join(user, ".gemini"), { recursive: true });
-    writeFileSync(join(user, ".gemini", "settings.json"), JSON.stringify({ security: { auth: { selectedType: "gemini-api-key" } } }, null, 2));
-    const link = spawnSync(geminiBin(), ["extensions", "link", REPO, "--consent"], { env, encoding: "utf8", cwd: proj });
-    if (link.status !== 0) throw new Error(`gemini extensions link: ${link.stderr}`);
-    writeFileSync(
-      join(dir, "policy.toml"),
-      `[[rule]]\ntoolName = "run_shell_command"\ncommandPrefix = ${JSON.stringify(join(home, "bin", "bluer"))}\ndecision = "allow"\npriority = 100\n\n` +
-        `[[rule]]\ntoolName = "activate_skill"\ndecision = "allow"\npriority = 100\n\n` +
-        `[[rule]]\ntoolName = "read_file"\ndecision = "allow"\npriority = 100\n`,
-    );
-  }
+  mkdirSync(join(proj, ".claude", "skills"), { recursive: true });
+  symlinkSync(skillDir, join(proj, ".claude", "skills", c.skill));
   return { env, proj, home, seeds };
 }
 
-function geminiBin(): string {
-  return process.env.GEMINI_BIN || "gemini";
-}
-
 async function turn(text: string, resume: boolean, ctx: { env: NodeJS.ProcessEnv; proj: string; home: string; dir: string }): Promise<Turn> {
-  if (agent === "claude-code") {
-    const args = ["-p", text, "--plugin-dir", join(REPO, "plugins", "claude-code"), "--setting-sources", "project,local"];
-    args.push("--allowedTools", `Bash(${join(ctx.home, "bin", "bluer")} *)`, "--output-format", "json");
-    if (values.model) args.push("--model", values.model);
-    if (resume) args.push("-c");
-    const r = await run("claude", args, { cwd: ctx.proj, env: ctx.env });
-    try {
-      const out = JSON.parse(r.stdout) as { result?: string; total_cost_usd?: number; modelUsage?: Record<string, unknown>; is_error?: boolean };
-      return { text: out.result ?? "", costUsd: out.total_cost_usd ?? 0, model: Object.keys(out.modelUsage ?? {}).join("+"), ok: !out.is_error };
-    } catch {
-      return { text: "", costUsd: 0, model: "", ok: false, error: (r.stderr || r.stdout).slice(0, 500) };
-    }
-  }
-  const args = ["--skip-trust", "--policy", join(ctx.dir, "policy.toml"), "-o", "stream-json", "-p", text];
+  const args = ["-p", text, "--plugin-dir", join(REPO, "plugins", "claude-code"), "--setting-sources", "project,local"];
+  args.push("--allowedTools", `Bash(${join(ctx.home, "bin", "bluer")} *)`, "--output-format", "json");
   if (values.model) args.push("--model", values.model);
-  if (resume) args.push("-r", "latest");
-  const r = await run(geminiBin(), args, { cwd: ctx.proj, env: ctx.env });
-  let reply = "";
-  let model = "";
-  for (const line of r.stdout.split("\n")) {
-    try {
-      const e = JSON.parse(line) as { type?: string; role?: string; content?: string; model?: string };
-      if (e.type === "init" && e.model) model = e.model;
-      if (e.type === "message" && e.role === "assistant") reply += e.content ?? "";
-    } catch {
-      // not a JSON line
-    }
+  if (resume) args.push("-c");
+  const r = await run("claude", args, { cwd: ctx.proj, env: ctx.env });
+  try {
+    const out = JSON.parse(r.stdout) as { result?: string; total_cost_usd?: number; modelUsage?: Record<string, unknown>; is_error?: boolean };
+    return { text: out.result ?? "", costUsd: out.total_cost_usd ?? 0, model: Object.keys(out.modelUsage ?? {}).join("+"), ok: !out.is_error };
+  } catch {
+    return { text: "", costUsd: 0, model: "", ok: false, error: (r.stderr || r.stdout).slice(0, 500) };
   }
-  return { text: reply, costUsd: 0, model, ok: r.code === 0, error: r.code === 0 ? undefined : r.stderr.slice(-500) };
 }
 
 function tierOf(lesson: Lesson, runs: number, today: string): string {

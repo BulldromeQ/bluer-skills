@@ -34,20 +34,19 @@ after each change.
 ## Run it
 
 Each case gets its own scratch folder: the run never touches your real
-`~/.bluer`, `~/.claude` or `~/.gemini`. Claude Code runs with
+`~/.bluer` or `~/.claude`. Claude Code runs with
 `--setting-sources project,local`, so your own settings, plugins and
 instructions stay out of the sessions.
 
 ```bash
 npm run build:plugin   # the sessions use the plugin's bundled CLI
 node evals/learning/run.ts --agent claude-code --model sonnet
-GEMINI_BIN=gemini node evals/learning/run.ts --agent gemini-cli
 node evals/learning/run.ts --agent claude-code --cases rule-length,undo-rule --keep
 ```
 
 | Option | What it does |
 |---|---|
-| `--agent claude-code` / `gemini-cli` | The agent to test. It must be installed and signed in |
+| `--agent claude-code` | The agent to test (only Claude Code so far). It must be installed and signed in |
 | `--model <name>` | The model, passed to the agent |
 | `--cases id,id` | Run only these cases |
 | `--jobs <n>` | Cases to run at the same time (default 4) |

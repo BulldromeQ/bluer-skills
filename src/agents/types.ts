@@ -20,7 +20,7 @@ export interface HookDialect {
 }
 
 /**
- * What bluer needs to know about one agent (Claude Code, Gemini CLI, ...).
+ * What bluer needs to know about one agent (Claude Code, Codex, ...).
  * Each agent gets one adapter. Two adapters may share a skills folder; bluer
  * links each skill there once.
  */
