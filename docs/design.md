@@ -181,9 +181,9 @@ its lessons are archived; when the step comes back, so do they.
 
 From most to least valuable:
 
-1. **Answers to the agent's questions.** "How clean should the table be?" The next
+1. **Answers to the agent's questions.** "Who should get the update?" The next
    run should not have to ask again.
-2. **Corrections from the user.** "No, do not move the papers on the desk."
+2. **Corrections from the user.** "No, leave out meetings shorter than 15 minutes."
 3. **The agent's own failures** inside the skill: a command that fails, a step
    that had to be done again.
 4. **Hand edits to `SKILL.md`.** A rebuild would lose them. bluer detects the
@@ -220,7 +220,7 @@ for real rules:
 | Rule | Main body of `SKILL.md` | The user said "always", "never" or "remember this"; or the lesson prevented a costly failure (impact `high`); or it was seen 3 times |
 | Edge case | `references/learned-edge-cases.md`, read only when the case comes up | Seen 2 times, or impact `medium` |
 | Candidate | `learnings.md` only; the built skill does not change | Seen once, impact `low` |
-| Ignored | Kept in `learnings.md`, never built | About one run only ("today there is a cake on the table"). A one-off that comes back is no longer a one-off. |
+| Ignored | Kept in `learnings.md`, never built | About one run only ("this week, leave out the offsite planning"). A one-off that comes back is no longer a one-off. |
 
 - A candidate expires after 30 days or 10 runs without a sighting. It is kept as
   `expired`, and becomes active again if it is seen again.
@@ -249,8 +249,8 @@ drift:
 - A lesson contradicts the words of a step.
 
 ```text
-Step 2 says "clean the restroom". You told me 4 times to also restock the
-paper towels. Change step 2 to "clean the restroom and restock paper towels"?
+Step 3 says "email it to my team". You told me 4 times to post it in the
+team chat instead. Change step 3 to "post it in the team chat"?
 [yes] [no] [edit]
 ```
 

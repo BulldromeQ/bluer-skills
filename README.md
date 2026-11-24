@@ -33,63 +33,57 @@ one that learns**.
 
 ## How it works
 
-You write this, in chat or on the command line:
+Take a job many people already give an agent: the weekly update email.
+
+**1. You write the steps, in your own words.** In chat, or on the command line:
 
 ```text
-Doing house work, 1. clean the table, 2. clean the restroom, 3. clean the kitchen
+Weekly update, 1. read my calendar and notes from this week, 2. write a short summary, 3. email it to my team
 ```
 
-bluer saves it as `intent.md`, your version:
+bluer saves this as `intent.md`. It is yours, and it stays this short.
+
+**2. Your agent does the job, and bluer learns.** Over a few weeks:
+
+| What happened | What bluer did with it |
+|---|---|
+| You said "keep it under 150 words", three times | **Rule**, added to step 2 |
+| You said "always CC my manager" | **Rule** at once, because you said "always" |
+| Twice you were on vacation, and the update came out empty | **Edge case**, in a side file the agent reads only when needed |
+| You said "maybe use bullet points", once | **Candidate**: it waits to see if you say it again |
+| You said "this week, leave out the offsite planning" | **One-off**: not used next week |
+
+**3. bluer builds the skill your agent reads.** This is the `SKILL.md` it wrote
+(shown without its frontmatter):
 
 ```markdown
-# Doing house work
-
-1. clean the table
-2. clean the restroom
-3. clean the kitchen
-```
-
-Your agent does the job, and things happen. You say *"wipe the table with a damp
-cloth, then dry it"* (three times, because the agent keeps forgetting). You say
-*"never use bleach: we have a cat."* The agent finds that the kitchen sink is
-blocked. Today there is a birthday cake on the table.
-
-bluer sorts each lesson through its **learning gate**, then builds the
-`SKILL.md` your agent reads (shown without its frontmatter):
-
-```markdown
-# Doing house work
+# Weekly update
 
 Do these steps in order.
 
-## 1. clean the table
+## 1. read my calendar and notes from this week
 
-- Wipe with a damp cloth, then dry it
+## 2. write a short summary
 
-## 2. clean the restroom
+- Keep it under 150 words
 
-## 3. clean the kitchen
+## 3. email it to my team
 
-## General rules
-
-- Never use bleach: we have a cat
+- Always CC my manager
 
 ## Edge cases
 
 Rare cases are in references/learned-edge-cases.md. Read it when a step does not go as planned.
 ```
 
-The blocked sink went to the edge-case file, which the agent reads only when it
-needs to. The cake was about one day only, so bluer does not use it.
-
-Next week you add one line to your version:
+**4. You change your version, and nothing learned is lost.** Add one line to
+`intent.md`:
 
 ```markdown
-4. clean the living room
+4. add my plan for next week
 ```
 
-bluer rebuilds. Everything it learned about steps 1 to 3 stays, and step 4
-starts to learn.
+bluer rebuilds. The rules for steps 2 and 3 stay, and step 4 starts to learn.
 
 ```mermaid
 flowchart LR
@@ -159,11 +153,11 @@ cd bluer-skills && npm install
 alias bluer="node $PWD/src/main.ts"
 
 export BLUER_HOME=/tmp/bluer-try      # optional: try it without touching ~/.bluer
-bluer new "Doing house work, 1. clean the table, 2. clean the restroom, 3. clean the kitchen"
-bluer learn doing-house-work "Wipe with a damp cloth, then dry it" --step 1
-bluer learn doing-house-work "Never use bleach: we have a cat" --always
-bluer status doing-house-work
-bluer history doing-house-work
+bluer new "Weekly update, 1. read my calendar and notes from this week, 2. write a short summary, 3. email it to my team"
+bluer learn weekly-update "Keep it under 150 words" --step 2
+bluer learn weekly-update "Always CC my manager" --step 3 --always
+bluer status weekly-update
+bluer history weekly-update
 ```
 
 `bluer new` links the skill into `~/.claude/skills`, so Claude Code can use it at
