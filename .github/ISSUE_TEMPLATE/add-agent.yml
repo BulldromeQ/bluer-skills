@@ -1,0 +1,29 @@
+name: Bring bluer to another agent
+description: Propose or track an adapter for an agent that bluer does not support yet.
+labels: ["agent", "help wanted"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Read [docs/adding-an-agent.md](https://github.com/BulldromeQ/bluer-skills/blob/main/docs/adding-an-agent.md) first: it lists what the agent must offer.
+  - type: input
+    id: agent
+    attributes:
+      label: Agent
+      placeholder: "Cursor"
+    validations:
+      required: true
+  - type: textarea
+    id: support
+    attributes:
+      label: What the agent offers
+      description: Its skills folder, hook events, how a hook can tell which skill loaded, and how a package ships skills and hooks. Link to its docs or source.
+    validations:
+      required: true
+  - type: checkboxes
+    id: work
+    attributes:
+      label: Your plan
+      options:
+        - label: I want to build this adapter
+        - label: I can test it in a real session

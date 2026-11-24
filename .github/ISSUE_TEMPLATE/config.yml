@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: How bluer works
+    url: https://github.com/BulldromeQ/bluer-skills/blob/main/docs/design.md
+    about: The design doc explains the learning gate, versions and every decision.

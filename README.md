@@ -351,6 +351,10 @@ to, keeps rare cases out of the way, and versions every change.
 
 ## Contributing
 
+Start with [CONTRIBUTING.md](CONTRIBUTING.md). The most useful help right now:
+tell us when a skill learns something wrong, bring bluer to another agent, or
+pick a [good first issue](https://github.com/BulldromeQ/bluer-skills/labels/good%20first%20issue).
+
 Read [AGENTS.md](AGENTS.md) for how to build and test, and
 [docs/design.md](docs/design.md) for how bluer works and what is still open.
 To bring bluer to another agent, read

@@ -1,6 +1,6 @@
 {
   "name": "bluer-skills",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "bluer skills: agent skills you write in plain steps, that improve themselves with use.",
   "keywords": [
     "bluer-skills",

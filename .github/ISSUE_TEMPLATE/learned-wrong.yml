@@ -1,0 +1,43 @@
+name: A skill learned something wrong
+description: bluer recorded a lesson it should not have, missed one it should have, or put it in the wrong place.
+labels: ["learning"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you. These reports make bluer better for everyone: each one can become a learning eval case.
+        Remove anything private (names, addresses, work content) before you paste.
+  - type: input
+    id: agent
+    attributes:
+      label: Agent and model
+      placeholder: "Claude Code 2.1.x, Sonnet"
+    validations:
+      required: true
+  - type: textarea
+    id: skill
+    attributes:
+      label: Your steps (intent.md)
+      description: The skill's short version, in your words.
+      render: markdown
+  - type: textarea
+    id: said
+    attributes:
+      label: What you said
+      description: The message that should, or should not, have taught the skill something.
+    validations:
+      required: true
+  - type: textarea
+    id: happened
+    attributes:
+      label: What bluer did
+      description: The receipt line your agent showed, or the output of `bluer status <skill>`.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      description: "For example, \"a rule at step 2\", \"nothing: it was a one-off\", or \"the same lesson seen again\"."
+    validations:
+      required: true

@@ -59,6 +59,10 @@ build on what the owner wrote. The project owner made it for bluer, and it is
 under the repo's MIT license. To change it, use a 1024 x 1024 PNG with
 transparent corners, and check that it still reads at 32 px.
 
+The GitHub social preview card (`docs/brand/social-card.png`) is rendered by
+`docs/brand/render_social_card.py`. Upload it by hand in the repo settings after
+a change.
+
 The README demo (`docs/demo/bluer-demo.gif`) is a scripted animation that
 `docs/demo/render_demo.py` renders with Pillow and ffmpeg; see the script's
 header. Keep its agent lines true to what the plugin really does, and render it
