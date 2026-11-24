@@ -7,14 +7,16 @@ import type { HookEvent } from "./hooks.ts";
 export interface HookDialect {
   /** The agent's event name for each bluer hook event, used in hookSpecificOutput.hookEventName. */
   eventNames: Record<HookEvent, string>;
-  /** The tool the model calls to load a skill. */
-  skillTool: string;
-  /** The field of that tool's input that holds the skill name. */
-  skillField: string;
+  /** The name of the skill that this tool call loads, or null when it loads none. */
+  skillFromTool(toolName: string, toolInput: Record<string, unknown>): string | null;
   /** True for the skills that the bluer plugin or extension ships itself. */
   isOwnSkill(name: string): boolean;
-  /** True when typing "/<skill>" loads a skill without calling skillTool, so the prompt hook must catch it. */
-  slashSkipsTool: boolean;
+  /**
+   * The skill that a user message loads without any tool call ("/<skill>" in
+   * Claude Code, "$<skill>" in Codex), or null. Absent when every skill load is
+   * a tool call.
+   */
+  skillFromPrompt?(prompt: string): string | null;
 }
 
 /**

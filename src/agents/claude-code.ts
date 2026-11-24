@@ -19,9 +19,8 @@ export const claudeCode: AgentAdapter = {
       "post-tool-use": "PostToolUse",
       "session-end": "SessionEnd",
     },
-    skillTool: "Skill",
-    skillField: "skill",
+    skillFromTool: (tool, input) => (tool === "Skill" ? String(input.skill ?? "").replace(/^\//, "") || null : null),
     isOwnSkill: (name) => name.startsWith("bluer:"),
-    slashSkipsTool: true,
+    skillFromPrompt: (prompt) => /^\/([a-z0-9]+(?:-[a-z0-9]+)*)(?:\s|$)/.exec(prompt.trim())?.[1] ?? null,
   },
 };

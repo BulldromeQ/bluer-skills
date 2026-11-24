@@ -110,17 +110,21 @@ export function lastAssistantAsked(transcriptPath: string | undefined): boolean 
   const lines = tail.split("\n");
   for (let i = lines.length - 1; i >= 0; i--) {
     // Claude Code: { type: "assistant", message: { content } }. Gemini CLI: { type: "gemini", content }.
-    let entry: { type?: string; content?: unknown; message?: { content?: unknown } };
+    // Codex: { type: "response_item", payload: { type: "message", role: "assistant", content } }.
+    let entry: { type?: string; content?: unknown; message?: { content?: unknown }; payload?: { type?: string; role?: string; content?: unknown } };
     try {
       entry = JSON.parse(lines[i] ?? "");
     } catch {
       continue;
     }
-    if (entry.type !== "assistant" && entry.type !== "gemini") continue;
-    const content = entry.message?.content ?? entry.content;
-    // Claude Code: [{ type: "text", text }]. Gemini CLI: a string, or [{ text }].
+    const codexReply = entry.type === "response_item" && entry.payload?.type === "message" && entry.payload.role === "assistant";
+    if (entry.type !== "assistant" && entry.type !== "gemini" && !codexReply) continue;
+    const content = codexReply ? entry.payload?.content : (entry.message?.content ?? entry.content);
+    // Claude Code: [{ type: "text", text }]. Gemini CLI: a string, or [{ text }]. Codex: [{ type: "output_text", text }].
     const texts = Array.isArray(content)
-      ? content.flatMap((b: { type?: string; text?: unknown }) => ((b?.type === "text" || b?.type === undefined) && typeof b?.text === "string" ? [b.text] : []))
+      ? content.flatMap((b: { type?: string; text?: unknown }) =>
+          (b?.type === "text" || b?.type === "output_text" || b?.type === undefined) && typeof b?.text === "string" ? [b.text] : [],
+        )
       : typeof content === "string"
         ? [content]
         : [];
@@ -164,6 +168,7 @@ function knownText(cli: string, name: string, known: KnownLesson[]): string {
 }
 
 const WHAT_TO_RECORD =
+  "Pass --step N when the lesson is about one step of the skill, as most are; leave it off only for a lesson about the whole task. " +
   "Record each correction to how you did the task, even a small one (\"move the bug fixes to the end\", \"make it more casual\"): bluer's gate keeps rare ones out of the skill. " +
   "Use --always for a standing rule the user stated, even without the word always (\"keep it under 150 words\", \"always CC Sam\"); leave it off for a correction that depends on this situation. " +
   "Use --one-off for something true only this time (\"this week, leave out the offsite\"). " +
@@ -212,9 +217,10 @@ export function handleHook(agent: AgentAdapter, event: HookEvent, input: HookInp
   const cli = shimPath(ctx.home);
   const context = (forEvent: HookEvent, text: string): string =>
     JSON.stringify({ hookSpecificOutput: { hookEventName: dialect.eventNames[forEvent], additionalContext: text } });
+  // One run per skill per session: an agent may load or read a skill more than once while it does one job.
   const markLoaded = (name: string): void => {
-    store.recordRun(ctx, name);
     const state = loadState(ctx.home, agent.id, sessionId);
+    if (!state.skills.includes(name)) store.recordRun(ctx, name);
     state.skills = [...state.skills.filter((s) => s !== name), name];
     saveState(ctx.home, agent.id, sessionId, state);
   };
@@ -226,8 +232,8 @@ export function handleHook(agent: AgentAdapter, event: HookEvent, input: HookInp
       return "";
 
     case "post-tool-use": {
-      if (input.tool_name !== dialect.skillTool) return "";
-      const name = String(input.tool_input?.[dialect.skillField] ?? "").replace(/^\//, "");
+      const name = dialect.skillFromTool(input.tool_name ?? "", input.tool_input ?? {});
+      if (!name) return "";
       if (dialect.isOwnSkill(name)) {
         installShim(ctx.home, opts.cliPath);
         return context("post-tool-use", `bluer: run the bluer CLI as ${cli} in this session.`);
@@ -239,10 +245,10 @@ export function handleHook(agent: AgentAdapter, event: HookEvent, input: HookInp
 
     case "user-prompt-submit": {
       const prompt = input.prompt ?? "";
-      const slash = /^\/([a-z0-9]+(?:-[a-z0-9]+)*)(?:\s|$)/.exec(prompt.trim())?.[1];
-      if (dialect.slashSkipsTool && slash && store.hasSkill(ctx, slash)) {
-        markLoaded(slash);
-        return context("user-prompt-submit", loadedText(cli, slash, knownLessons(ctx, slash)));
+      const typed = dialect.skillFromPrompt?.(prompt);
+      if (typed && store.hasSkill(ctx, typed)) {
+        markLoaded(typed);
+        return context("user-prompt-submit", loadedText(cli, typed, knownLessons(ctx, typed)));
       }
       const active = loadState(ctx.home, agent.id, sessionId).skills.at(-1);
       if (!active || !store.hasSkill(ctx, active)) return "";

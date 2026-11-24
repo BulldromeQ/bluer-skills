@@ -7386,39 +7386,60 @@ var claudeCode = {
       "post-tool-use": "PostToolUse",
       "session-end": "SessionEnd"
     },
-    skillTool: "Skill",
-    skillField: "skill",
+    skillFromTool: (tool, input) => tool === "Skill" ? String(input.skill ?? "").replace(/^\//, "") || null : null,
     isOwnSkill: (name) => name.startsWith("bluer:"),
-    slashSkipsTool: true
+    skillFromPrompt: (prompt) => /^\/([a-z0-9]+(?:-[a-z0-9]+)*)(?:\s|$)/.exec(prompt.trim())?.[1] ?? null
   }
 };
 
 // src/agents/hooks.ts
-import { chmodSync, closeSync, existsSync as existsSync6, fstatSync, mkdirSync as mkdirSync4, openSync, readdirSync as readdirSync2, readFileSync as readFileSync3, readSync, rmSync as rmSync2, statSync, writeFileSync as writeFileSync3 } from "node:fs";
-import { dirname as dirname2, join as join7 } from "node:path";
+import { chmodSync, closeSync, existsSync as existsSync7, fstatSync, mkdirSync as mkdirSync4, openSync, readdirSync as readdirSync2, readFileSync as readFileSync3, readSync, rmSync as rmSync2, statSync, writeFileSync as writeFileSync3 } from "node:fs";
+import { dirname as dirname2, join as join8 } from "node:path";
 
 // src/store.ts
-import { cpSync, existsSync as existsSync5, mkdirSync as mkdirSync3, readdirSync, readFileSync as readFileSync2, realpathSync, rmSync, writeFileSync as writeFileSync2 } from "node:fs";
+import { cpSync, existsSync as existsSync6, mkdirSync as mkdirSync3, readdirSync, readFileSync as readFileSync2, realpathSync, rmSync, writeFileSync as writeFileSync2 } from "node:fs";
 import { homedir as homedir2 } from "node:os";
-import { basename, dirname, join as join6, resolve as resolve2, sep } from "node:path";
+import { basename, dirname, join as join7, resolve as resolve2, sep } from "node:path";
 
 // src/agents/index.ts
 import { lstatSync, mkdirSync, readlinkSync, renameSync, symlinkSync } from "node:fs";
-import { join as join3, resolve } from "node:path";
+import { join as join4, resolve } from "node:path";
 
 // src/errors.ts
 var BluerError = class extends Error {
   name = "BluerError";
 };
 
-// src/agents/gemini-cli.ts
+// src/agents/codex.ts
 import { existsSync as existsSync2 } from "node:fs";
 import { join as join2 } from "node:path";
+var SKILL_FILE = /([A-Za-z0-9_.-]+)\/SKILL\.md\b/;
+var codex = {
+  id: "codex",
+  displayName: "Codex",
+  skillsDir: (userHome) => join2(userHome, ".agents", "skills"),
+  isInstalled: (userHome) => existsSync2(join2(userHome, ".codex")),
+  hooks: {
+    eventNames: {
+      "session-start": "SessionStart",
+      "user-prompt-submit": "UserPromptSubmit",
+      "post-tool-use": "PostToolUse",
+      "session-end": "SessionEnd"
+    },
+    skillFromTool: (tool, input) => tool === "Bash" ? SKILL_FILE.exec(String(input.command ?? ""))?.[1] ?? null : null,
+    isOwnSkill: (name) => name === "bluer",
+    skillFromPrompt: (prompt) => /(?:^|\s)\$([a-z0-9]+(?:-[a-z0-9]+)*)\b/.exec(prompt)?.[1] ?? null
+  }
+};
+
+// src/agents/gemini-cli.ts
+import { existsSync as existsSync3 } from "node:fs";
+import { join as join3 } from "node:path";
 var geminiCli = {
   id: "gemini-cli",
   displayName: "Gemini CLI",
-  skillsDir: (userHome) => join2(userHome, ".agents", "skills"),
-  isInstalled: (userHome) => existsSync2(join2(userHome, ".gemini")),
+  skillsDir: (userHome) => join3(userHome, ".agents", "skills"),
+  isInstalled: (userHome) => existsSync3(join3(userHome, ".gemini")),
   hooks: {
     eventNames: {
       "session-start": "SessionStart",
@@ -7426,15 +7447,13 @@ var geminiCli = {
       "post-tool-use": "AfterTool",
       "session-end": "SessionEnd"
     },
-    skillTool: "activate_skill",
-    skillField: "name",
-    isOwnSkill: (name) => name === "bluer",
-    slashSkipsTool: false
+    skillFromTool: (tool, input) => tool === "activate_skill" ? String(input.name ?? "") || null : null,
+    isOwnSkill: (name) => name === "bluer"
   }
 };
 
 // src/agents/index.ts
-var AGENTS = [claudeCode, geminiCli];
+var AGENTS = [claudeCode, geminiCli, codex];
 function findAgent(id) {
   const agent = AGENTS.find((a) => a.id === id);
   if (!agent) throw new BluerError(`Unknown agent "${id}". Known agents: ${AGENTS.map((a) => a.id).join(", ")}.`);
@@ -7449,7 +7468,7 @@ function lstatOrNull(path) {
 }
 function linkSkill(agent, opts) {
   const agentDir = agent.skillsDir(opts.userHome);
-  const target = join3(agentDir, opts.name);
+  const target = join4(agentDir, opts.name);
   const existing = lstatOrNull(target);
   let result = "linked";
   if (existing) {
@@ -7463,7 +7482,7 @@ function linkSkill(agent, opts) {
     }
     mkdirSync(opts.backupsDir, { recursive: true });
     const stamp = (opts.now ?? /* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
-    renameSync(target, join3(opts.backupsDir, `${agent.id}-${opts.name}-${stamp}`));
+    renameSync(target, join4(opts.backupsDir, `${agent.id}-${opts.name}-${stamp}`));
     result = "replaced";
   }
   mkdirSync(agentDir, { recursive: true });
@@ -7642,8 +7661,8 @@ ${bullets(general)}`);
 
 // src/git.ts
 import { execFileSync } from "node:child_process";
-import { existsSync as existsSync3 } from "node:fs";
-import { join as join4 } from "node:path";
+import { existsSync as existsSync4 } from "node:fs";
+import { join as join5 } from "node:path";
 function git(cwd, args) {
   try {
     return execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
@@ -7661,7 +7680,7 @@ function configValue(cwd, key) {
   }
 }
 function ensureRepo(dir) {
-  if (!existsSync3(join4(dir, ".git"))) git(dir, ["init", "-q", "-b", "main"]);
+  if (!existsSync4(join5(dir, ".git"))) git(dir, ["init", "-q", "-b", "main"]);
   if (!configValue(dir, "user.email")) {
     git(dir, ["config", "user.name", "bluer"]);
     git(dir, ["config", "user.email", "bluer@localhost"]);
@@ -7675,9 +7694,9 @@ function commitPaths(dir, paths, message) {
 }
 
 // src/home.ts
-import { existsSync as existsSync4, mkdirSync as mkdirSync2, readFileSync, writeFileSync } from "node:fs";
+import { existsSync as existsSync5, mkdirSync as mkdirSync2, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join as join5 } from "node:path";
+import { join as join6 } from "node:path";
 var LEARNING_MODES = ["auto", "review", "off"];
 var SHARING_LEVELS = ["ask", "digest", "off"];
 var TEST_LEVELS = ["standard", "light", "thorough"];
@@ -7689,18 +7708,18 @@ var DEFAULT_SETTINGS = {
   creator: "builtin"
 };
 function defaultHome(env = process.env) {
-  return env.BLUER_HOME || join5(homedir(), ".bluer");
+  return env.BLUER_HOME || join6(homedir(), ".bluer");
 }
-var skillsDir = (home) => join5(home, "skills");
-var backupsDir = (home) => join5(home, "backups");
+var skillsDir = (home) => join6(home, "skills");
+var backupsDir = (home) => join6(home, "backups");
 var IGNORED = ["backups/", "bin/", "runtime/", "state/"];
 function initHome(home) {
-  const created = !existsSync4(join5(home, "settings.json"));
+  const created = !existsSync5(join6(home, "settings.json"));
   mkdirSync2(skillsDir(home), { recursive: true });
   ensureRepo(home);
-  if (created) writeFileSync(join5(home, "settings.json"), JSON.stringify(DEFAULT_SETTINGS, null, 2) + "\n");
-  const ignoreFile = join5(home, ".gitignore");
-  const ignored = existsSync4(ignoreFile) ? readFileSync(ignoreFile, "utf8") : "";
+  if (created) writeFileSync(join6(home, "settings.json"), JSON.stringify(DEFAULT_SETTINGS, null, 2) + "\n");
+  const ignoreFile = join6(home, ".gitignore");
+  const ignored = existsSync5(ignoreFile) ? readFileSync(ignoreFile, "utf8") : "";
   const missing = IGNORED.filter((line) => !ignored.split("\n").includes(line));
   const prefix = ignored && !ignored.endsWith("\n") ? `${ignored}
 ` : ignored;
@@ -7716,8 +7735,8 @@ function check(allowed, value, key) {
   throw new BluerError(`settings.json: "${key}" must be one of ${allowed.join(", ")}.`);
 }
 function loadSettings(home) {
-  const file = join5(home, "settings.json");
-  if (!existsSync4(file)) return { ...DEFAULT_SETTINGS };
+  const file = join6(home, "settings.json");
+  if (!existsSync5(file)) return { ...DEFAULT_SETTINGS };
   const raw = { ...DEFAULT_SETTINGS, ...JSON.parse(readFileSync(file, "utf8")) };
   return {
     learning: check(LEARNING_MODES, raw.learning, "learning"),
@@ -7906,30 +7925,30 @@ function toLesson(id, text, f) {
 
 // src/store.ts
 var read = (path) => readFileSync2(path, "utf8");
-var readIfExists = (path) => existsSync5(path) ? read(path) : null;
+var readIfExists = (path) => existsSync6(path) ? read(path) : null;
 var skillPathInRepo = (name) => `skills/${name}`;
 var changelogHeader = (name) => `# Changelog: ${name}
 
 `;
 function loadSkill(ctx, name) {
   checkName(name);
-  const dir = join6(skillsDir(ctx.home), name);
-  const metaFile = join6(dir, "bluer.json");
-  if (!existsSync5(metaFile)) throw new BluerError(`There is no skill named "${name}". Run "bluer list" to see your skills.`);
+  const dir = join7(skillsDir(ctx.home), name);
+  const metaFile = join7(dir, "bluer.json");
+  if (!existsSync6(metaFile)) throw new BluerError(`There is no skill named "${name}". Run "bluer list" to see your skills.`);
   const meta = JSON.parse(read(metaFile));
-  const intentText = meta.mode === "intent" ? read(join6(dir, "intent.md")) : null;
+  const intentText = meta.mode === "intent" ? read(join7(dir, "intent.md")) : null;
   return {
     name,
     dir,
     meta,
     intent: intentText === null ? null : parseIntent(intentText),
-    base: meta.mode === "base" ? read(join6(dir, "base", "SKILL.md")) : null,
-    lessons: parseLearnings(readIfExists(join6(dir, "learnings.md")) ?? ""),
-    changelog: readIfExists(join6(dir, "CHANGELOG.md")) ?? changelogHeader(name)
+    base: meta.mode === "base" ? read(join7(dir, "base", "SKILL.md")) : null,
+    lessons: parseLearnings(readIfExists(join7(dir, "learnings.md")) ?? ""),
+    changelog: readIfExists(join7(dir, "CHANGELOG.md")) ?? changelogHeader(name)
   };
 }
 function writeMeta(skill) {
-  writeFileSync2(join6(skill.dir, "bluer.json"), JSON.stringify(skill.meta, null, 2) + "\n");
+  writeFileSync2(join7(skill.dir, "bluer.json"), JSON.stringify(skill.meta, null, 2) + "\n");
 }
 function build(ctx, skill, lessons, version) {
   return buildSkill({
@@ -7945,14 +7964,14 @@ function build(ctx, skill, lessons, version) {
   });
 }
 function save(ctx, skill, summary, opts = {}) {
-  const skillMdPath = join6(skill.dir, "SKILL.md");
-  const edgePath = join6(skill.dir, EDGE_CASES_FILE);
+  const skillMdPath = join7(skill.dir, "SKILL.md");
+  const edgePath = join7(skill.dir, EDGE_CASES_FILE);
   let lessons = skill.lessons;
   const current = readIfExists(skillMdPath);
   if (current !== null && skill.meta.builtHash && sha256(current) !== skill.meta.builtHash) {
     const saved = `hand-edits/SKILL-v${skill.meta.version}-${ctx.today}.md`;
-    mkdirSync3(join6(skill.dir, "hand-edits"), { recursive: true });
-    writeFileSync2(join6(skill.dir, saved), current);
+    mkdirSync3(join7(skill.dir, "hand-edits"), { recursive: true });
+    writeFileSync2(join7(skill.dir, saved), current);
     lessons = recordLesson(
       lessons,
       { text: `SKILL.md was edited by hand. The edit is saved in ${saved}. Turn it into lessons.`, source: "hand-edit", impact: "medium", pending: true },
@@ -7977,11 +7996,11 @@ function save(ctx, skill, summary, opts = {}) {
     skill.changelog = `${skill.changelog.trimEnd()}
 - v${version} (${ctx.today}): ${message}
 `;
-    writeFileSync2(join6(skill.dir, "CHANGELOG.md"), skill.changelog);
+    writeFileSync2(join7(skill.dir, "CHANGELOG.md"), skill.changelog);
     skill.meta = { ...skill.meta, version, builtHash: sha256(result.skillMd) };
   }
   skill.lessons = result.lessons;
-  writeFileSync2(join6(skill.dir, "learnings.md"), formatLearnings(skill.name, result.lessons));
+  writeFileSync2(join7(skill.dir, "learnings.md"), formatLearnings(skill.name, result.lessons));
   writeMeta(skill);
   commitPaths(ctx.home, [skillPathInRepo(skill.name)], version === null ? `${skill.name}: ${message}` : `${skill.name} v${version}: ${message}`);
   return { version };
@@ -8012,10 +8031,10 @@ function createSkill(ctx, text, opts = {}) {
     throw new BluerError(`Pick a name for "${intent.title}" with --name, using lowercase letters, digits and hyphens.`);
   }
   checkName(name);
-  const dir = join6(skillsDir(ctx.home), name);
-  if (existsSync5(dir)) throw new BluerError(`A skill named "${name}" already exists. Pick another name with --name.`);
+  const dir = join7(skillsDir(ctx.home), name);
+  if (existsSync6(dir)) throw new BluerError(`A skill named "${name}" already exists. Pick another name with --name.`);
   mkdirSync3(dir, { recursive: true });
-  writeFileSync2(join6(dir, "intent.md"), formatIntent(intent));
+  writeFileSync2(join7(dir, "intent.md"), formatIntent(intent));
   const skill = {
     name,
     dir,
@@ -8032,7 +8051,7 @@ function createSkill(ctx, text, opts = {}) {
 function adoptSkill(ctx, path, opts = {}) {
   initHome(ctx.home);
   const src = resolve2(path);
-  const text = readIfExists(join6(src, "SKILL.md"));
+  const text = readIfExists(join7(src, "SKILL.md"));
   if (text === null) throw new BluerError(`There is no SKILL.md in ${src}.`);
   const real = realpathSync(src);
   if (real.startsWith(realpathSync(skillsDir(ctx.home)) + sep)) throw new BluerError(`${src} is already a bluer skill.`);
@@ -8042,17 +8061,17 @@ function adoptSkill(ctx, path, opts = {}) {
   const { data } = splitFrontmatter(text);
   const name = opts.name ?? (typeof data.name === "string" ? data.name : basename(src));
   checkName(name);
-  const dir = join6(skillsDir(ctx.home), name);
-  if (existsSync5(dir)) throw new BluerError(`A skill named "${name}" already exists. Pick another name with --name.`);
+  const dir = join7(skillsDir(ctx.home), name);
+  if (existsSync6(dir)) throw new BluerError(`A skill named "${name}" already exists. Pick another name with --name.`);
   cpSync(src, dir, { recursive: true, dereference: true, filter: (from) => basename(from) !== ".git" });
-  mkdirSync3(join6(dir, "base"), { recursive: true });
-  writeFileSync2(join6(dir, "base", "SKILL.md"), text);
-  writeFileSync2(join6(dir, "learnings.md"), formatLearnings(name, []));
+  mkdirSync3(join7(dir, "base"), { recursive: true });
+  writeFileSync2(join7(dir, "base", "SKILL.md"), text);
+  writeFileSync2(join7(dir, "learnings.md"), formatLearnings(name, []));
   const shownPath = src.startsWith(homedir2()) ? `~${src.slice(homedir2().length)}` : src;
-  writeFileSync2(join6(dir, "CHANGELOG.md"), `${changelogHeader(name)}- v0 (${ctx.today}): adopted from ${shownPath}
+  writeFileSync2(join7(dir, "CHANGELOG.md"), `${changelogHeader(name)}- v0 (${ctx.today}): adopted from ${shownPath}
 `);
   const meta = { mode: "base", source: "local", version: 0, runs: 0, builtHash: sha256(text) };
-  writeFileSync2(join6(dir, "bluer.json"), JSON.stringify(meta, null, 2) + "\n");
+  writeFileSync2(join7(dir, "bluer.json"), JSON.stringify(meta, null, 2) + "\n");
   commitPaths(ctx.home, [skillPathInRepo(name)], `${name} v0: adopted from ${shownPath}`);
   return { name, dir };
 }
@@ -8124,7 +8143,7 @@ function resolveStep(skill, step) {
 function setLearning(ctx, name, mode) {
   if (name === null) {
     initHome(ctx.home);
-    const file = join6(ctx.home, "settings.json");
+    const file = join7(ctx.home, "settings.json");
     writeFileSync2(file, JSON.stringify({ ...loadSettings(ctx.home), learning: mode }, null, 2) + "\n");
     ctx.settings = { ...ctx.settings, learning: mode };
     commitPaths(ctx.home, ["settings.json"], `learning for all skills: ${mode}`);
@@ -8159,7 +8178,7 @@ function addStep(ctx, name, step) {
   if (!text) throw new BluerError("The step is empty.");
   const skill = loadSkill(ctx, name);
   if (!skill.intent) throw new BluerError(`"${name}" was adopted and has no intent.md yet, so it has no steps to add to.`);
-  const file = join6(skill.dir, "intent.md");
+  const file = join7(skill.dir, "intent.md");
   const current = read(file);
   const number = skill.intent.steps.length + 1;
   writeFileSync2(file, `${current.replace(/\s*$/, "")}
@@ -8170,7 +8189,7 @@ ${number}. ${text}
   return { number, ...save(ctx, updated, `added step ${number}: ${text}`) };
 }
 function hasSkill(ctx, name) {
-  return NAME_OK.test(name) && existsSync5(join6(skillsDir(ctx.home), name, "bluer.json"));
+  return NAME_OK.test(name) && existsSync6(join7(skillsDir(ctx.home), name, "bluer.json"));
 }
 var NAME_OK = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 function rebuild(ctx, name) {
@@ -8204,7 +8223,7 @@ function rollback(ctx, name, target) {
 }
 function status(ctx, name) {
   const skill = loadSkill(ctx, name);
-  const current = readIfExists(join6(skill.dir, "SKILL.md"));
+  const current = readIfExists(join7(skill.dir, "SKILL.md"));
   const result = build(ctx, skill, skill.lessons, skill.meta.version);
   const count = (s) => result.lessons.filter((l) => l.status === s).length;
   return {
@@ -8229,8 +8248,8 @@ function status(ctx, name) {
 }
 function listSkills(ctx) {
   const dir = skillsDir(ctx.home);
-  if (!existsSync5(dir)) return [];
-  return readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory() && existsSync5(join6(dir, e.name, "bluer.json"))).map((e) => e.name).sort();
+  if (!existsSync6(dir)) return [];
+  return readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory() && existsSync6(join7(dir, e.name, "bluer.json"))).map((e) => e.name).sort();
 }
 function link(ctx, name, agent, replace) {
   const skill = loadSkill(ctx, name);
@@ -8239,25 +8258,25 @@ function link(ctx, name, agent, replace) {
 
 // src/agents/hooks.ts
 var HOOK_EVENTS = ["session-start", "user-prompt-submit", "post-tool-use", "session-end"];
-var shimPath = (home) => join7(home, "bin", "bluer");
+var shimPath = (home) => join8(home, "bin", "bluer");
 var STATE_TTL_MS = 7 * 24 * 60 * 60 * 1e3;
-var stateDir = (home, agent) => join7(home, "state", agent);
+var stateDir = (home, agent) => join8(home, "state", agent);
 function pruneState(home, now = Date.now()) {
-  const root = join7(home, "state");
-  if (!existsSync6(root)) return;
+  const root = join8(home, "state");
+  if (!existsSync7(root)) return;
   for (const agent of readdirSync2(root)) {
-    const dir = join7(root, agent);
+    const dir = join8(root, agent);
     if (!statSync(dir).isDirectory()) continue;
     for (const file of readdirSync2(dir)) {
-      const path = join7(dir, file);
+      const path = join8(dir, file);
       if (now - statSync(path).mtimeMs > STATE_TTL_MS) rmSync2(path, { force: true });
     }
   }
 }
-var statePath = (home, agent, sessionId) => join7(stateDir(home, agent), `${sessionId.replace(/[^A-Za-z0-9_-]/g, "_") || "unknown"}.json`);
+var statePath = (home, agent, sessionId) => join8(stateDir(home, agent), `${sessionId.replace(/[^A-Za-z0-9_-]/g, "_") || "unknown"}.json`);
 function loadState(home, agent, sessionId) {
   const file = statePath(home, agent, sessionId);
-  if (!existsSync6(file)) return { skills: [] };
+  if (!existsSync7(file)) return { skills: [] };
   try {
     const parsed = JSON.parse(readFileSync3(file, "utf8"));
     return { skills: Array.isArray(parsed.skills) ? parsed.skills.filter((s) => typeof s === "string") : [] };
@@ -8282,12 +8301,12 @@ function installShim(home, cliPath, nodePath = process.execPath) {
 if [ -x ${shellQuote(nodePath)} ]; then exec ${shellQuote(nodePath)} ${cli} "$@"; fi
 exec node ${cli} "$@"
 `;
-  if (!existsSync6(shim) || readFileSync3(shim, "utf8") !== body) writeFileSync3(shim, body);
+  if (!existsSync7(shim) || readFileSync3(shim, "utf8") !== body) writeFileSync3(shim, body);
   chmodSync(shim, 493);
   return shim;
 }
 function lastAssistantAsked(transcriptPath) {
-  if (!transcriptPath || !existsSync6(transcriptPath)) return false;
+  if (!transcriptPath || !existsSync7(transcriptPath)) return false;
   const tail = readTail(transcriptPath, 256 * 1024);
   const lines = tail.split("\n");
   for (let i = lines.length - 1; i >= 0; i--) {
@@ -8297,9 +8316,12 @@ function lastAssistantAsked(transcriptPath) {
     } catch {
       continue;
     }
-    if (entry.type !== "assistant" && entry.type !== "gemini") continue;
-    const content = entry.message?.content ?? entry.content;
-    const texts = Array.isArray(content) ? content.flatMap((b) => (b?.type === "text" || b?.type === void 0) && typeof b?.text === "string" ? [b.text] : []) : typeof content === "string" ? [content] : [];
+    const codexReply = entry.type === "response_item" && entry.payload?.type === "message" && entry.payload.role === "assistant";
+    if (entry.type !== "assistant" && entry.type !== "gemini" && !codexReply) continue;
+    const content = codexReply ? entry.payload?.content : entry.message?.content ?? entry.content;
+    const texts = Array.isArray(content) ? content.flatMap(
+      (b) => (b?.type === "text" || b?.type === "output_text" || b?.type === void 0) && typeof b?.text === "string" ? [b.text] : []
+    ) : typeof content === "string" ? [content] : [];
     if (texts.length === 0) continue;
     return /[?？]/.test(texts.join("\n").slice(-400));
   }
@@ -8325,7 +8347,7 @@ function knownText(cli, name, known) {
   const more = known.length > MAX_KNOWN ? ` (and ${known.length - MAX_KNOWN} more; run ${cli} status ${name})` : "";
   return `What the skill has learned: ${shown.join(" | ")}${more}. If the user says one of these again, in any words, record the repeat by id, for example: ${cli} learn ${name} ${known[0]?.id ?? "L1"}. Repeats are how a correction becomes a rule.`;
 }
-var WHAT_TO_RECORD = `Record each correction to how you did the task, even a small one ("move the bug fixes to the end", "make it more casual"): bluer's gate keeps rare ones out of the skill. Use --always for a standing rule the user stated, even without the word always ("keep it under 150 words", "always CC Sam"); leave it off for a correction that depends on this situation. Use --one-off for something true only this time ("this week, leave out the offsite"). Record nothing for new content for this run (this week's items, a fact for this draft only), thanks, or questions.`;
+var WHAT_TO_RECORD = `Pass --step N when the lesson is about one step of the skill, as most are; leave it off only for a lesson about the whole task. Record each correction to how you did the task, even a small one ("move the bug fixes to the end", "make it more casual"): bluer's gate keeps rare ones out of the skill. Use --always for a standing rule the user stated, even without the word always ("keep it under 150 words", "always CC Sam"); leave it off for a correction that depends on this situation. Use --one-off for something true only this time ("this week, leave out the offsite"). Record nothing for new content for this run (this week's items, a fact for this draft only), thanks, or questions.`;
 function loadedText(cli, name, known = []) {
   return [
     `bluer: "${name}" is a bluer skill. It learns from this session.`,
@@ -8363,8 +8385,8 @@ function handleHook(agent, event, input, ctx, opts) {
   const cli = shimPath(ctx.home);
   const context2 = (forEvent, text) => JSON.stringify({ hookSpecificOutput: { hookEventName: dialect.eventNames[forEvent], additionalContext: text } });
   const markLoaded = (name) => {
-    recordRun(ctx, name);
     const state = loadState(ctx.home, agent.id, sessionId);
+    if (!state.skills.includes(name)) recordRun(ctx, name);
     state.skills = [...state.skills.filter((s) => s !== name), name];
     saveState(ctx.home, agent.id, sessionId, state);
   };
@@ -8374,8 +8396,8 @@ function handleHook(agent, event, input, ctx, opts) {
       pruneState(ctx.home);
       return "";
     case "post-tool-use": {
-      if (input.tool_name !== dialect.skillTool) return "";
-      const name = String(input.tool_input?.[dialect.skillField] ?? "").replace(/^\//, "");
+      const name = dialect.skillFromTool(input.tool_name ?? "", input.tool_input ?? {});
+      if (!name) return "";
       if (dialect.isOwnSkill(name)) {
         installShim(ctx.home, opts.cliPath);
         return context2("post-tool-use", `bluer: run the bluer CLI as ${cli} in this session.`);
@@ -8386,10 +8408,10 @@ function handleHook(agent, event, input, ctx, opts) {
     }
     case "user-prompt-submit": {
       const prompt = input.prompt ?? "";
-      const slash = /^\/([a-z0-9]+(?:-[a-z0-9]+)*)(?:\s|$)/.exec(prompt.trim())?.[1];
-      if (dialect.slashSkipsTool && slash && hasSkill(ctx, slash)) {
-        markLoaded(slash);
-        return context2("user-prompt-submit", loadedText(cli, slash, knownLessons(ctx, slash)));
+      const typed = dialect.skillFromPrompt?.(prompt);
+      if (typed && hasSkill(ctx, typed)) {
+        markLoaded(typed);
+        return context2("user-prompt-submit", loadedText(cli, typed, knownLessons(ctx, typed)));
       }
       const active = loadState(ctx.home, agent.id, sessionId).skills.at(-1);
       if (!active || !hasSkill(ctx, active)) return "";

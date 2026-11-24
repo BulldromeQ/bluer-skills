@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
 import { claudeCode } from "../src/agents/claude-code.ts";
+import { codex } from "../src/agents/codex.ts";
 import { geminiCli } from "../src/agents/gemini-cli.ts";
 import { handleHook, installShim, lastAssistantAsked, pruneState, shimPath, type HookEvent } from "../src/agents/hooks.ts";
 import type { AgentAdapter } from "../src/agents/types.ts";
@@ -356,5 +357,68 @@ describe("Gemini CLI dialect", () => {
     ];
     writeFileSync(file, lines.map((l) => JSON.stringify(l)).join("\n") + "\n");
     assert.equal(lastAssistantAsked(file), true);
+  });
+});
+
+describe("Codex dialect", () => {
+  const read = (path: string) => ({ tool_name: "Bash", tool_input: { command: `sed -n '1,200p' ${path}` } });
+
+  it("counts a run when the model reads a bluer skill's SKILL.md, once per session", () => {
+    const { ctx } = setup();
+    const out = contextOf(hook(ctx, "post-tool-use", { session_id: "c1", ...read("/home/me/.agents/skills/weekly-update/SKILL.md") }, codex));
+    assert.equal(out.hookEventName, "PostToolUse");
+    assert.match(out.additionalContext, /"weekly-update" is a bluer skill/);
+    hook(ctx, "post-tool-use", { session_id: "c1", tool_name: "Bash", tool_input: { command: "sed -n '200,400p' r0/weekly-update/SKILL.md" } }, codex);
+    assert.equal(runs(ctx), 1, "reading the file in two parts is one run");
+    assert.ok(existsSync(join(ctx.home, "state", "codex", "c1.json")));
+  });
+
+  it("ignores other commands, other skills and the plugin's own skill", () => {
+    const { ctx } = setup();
+    assert.equal(hook(ctx, "post-tool-use", { session_id: "c1", tool_name: "Bash", tool_input: { command: "ls -la" } }, codex), "");
+    assert.equal(hook(ctx, "post-tool-use", { session_id: "c1", ...read("/x/skills/pdf/SKILL.md") }, codex), "");
+    const own = contextOf(hook(ctx, "post-tool-use", { session_id: "c1", ...read("/c/plugins/cache/bluer-skills/bluer/local/skills/bluer/SKILL.md") }, codex));
+    assert.match(own.additionalContext, /run the bluer CLI as/);
+    assert.equal(runs(ctx), 0);
+  });
+
+  it("loads a skill the user names with $, which Codex reads without a tool call", () => {
+    const { ctx } = setup();
+    const out = contextOf(hook(ctx, "user-prompt-submit", { session_id: "c2", prompt: "Use $weekly-update for this week" }, codex));
+    assert.match(out.additionalContext, /"weekly-update" is a bluer skill/);
+    assert.equal(runs(ctx), 1);
+    assert.doesNotMatch(hook(ctx, "user-prompt-submit", { session_id: "c3", prompt: "it costs $5" }, codex), /is a bluer skill/);
+  });
+
+  it("reads a question from a Codex transcript", () => {
+    const { root } = setup();
+    const file = join(root, "rollout.jsonl");
+    const lines = [
+      { timestamp: "t", type: "session_meta", payload: { id: "c1" } },
+      { timestamp: "t", type: "response_item", payload: { type: "message", role: "user", content: [{ type: "input_text", text: "write my weekly update" }] } },
+      { timestamp: "t", type: "response_item", payload: { type: "message", role: "assistant", content: [{ type: "output_text", text: "Who should get it?" }] } },
+      { timestamp: "t", type: "event_msg", payload: { type: "token_count" } },
+    ];
+    writeFileSync(file, lines.map((l) => JSON.stringify(l)).join("\n") + "\n");
+    assert.equal(lastAssistantAsked(file), true);
+  });
+
+  it("ships a Codex manifest and hook file that run the hooks as codex", () => {
+    const plugin = join(import.meta.dirname, "..", "plugins", "claude-code");
+    const manifest = JSON.parse(readFileSync(join(plugin, ".codex-plugin", "plugin.json"), "utf8")) as { name: string; skills: string; hooks: string };
+    assert.equal(manifest.name, "bluer");
+    for (const path of [manifest.skills, manifest.hooks]) {
+      assert.match(path, /^\.\//, "Codex ignores manifest paths that do not start with ./");
+      assert.ok(existsSync(join(plugin, path)), path);
+    }
+    const hooks = JSON.parse(readFileSync(join(plugin, manifest.hooks), "utf8")) as { hooks: Record<string, { matcher?: string; hooks: { command: string; timeout: number }[] }[]> };
+    assert.deepEqual(Object.keys(hooks.hooks).sort(), ["PostToolUse", "SessionEnd", "SessionStart", "UserPromptSubmit"]);
+    for (const [event, groups] of Object.entries(hooks.hooks)) {
+      for (const h of groups.flatMap((g) => g.hooks)) {
+        assert.match(h.command, /^sh "\$\{PLUGIN_ROOT\}\/bin\/bluer" hook codex [a-z-]+$/, event);
+        if (event === "SessionEnd") assert.ok(h.timeout <= 3, "Codex caps SessionEnd hooks at 3 seconds");
+      }
+    }
+    assert.equal(hooks.hooks.PostToolUse?.[0]?.matcher, "Bash");
   });
 });

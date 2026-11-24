@@ -1,7 +1,6 @@
 # Adding an agent
 
-bluer ships adapters for Claude Code and Gemini CLI, and one for OpenAI Codex
-is next. Support for other agents (Google Antigravity, Cursor, GitHub Copilot
+bluer ships adapters for Claude Code, Gemini CLI and OpenAI Codex. Support for other agents (Google Antigravity, Cursor, GitHub Copilot
 and others) is open to contributors. This guide says what an adapter needs, and how to prove that it
 works.
 

@@ -1,0 +1,17 @@
+{
+  "description": "bluer: count skill runs and capture lessons in OpenAI Codex. Codex reads this file through .codex-plugin/plugin.json; Claude Code reads hooks.json.",
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [{ "type": "command", "command": "sh \"${PLUGIN_ROOT}/bin/bluer\" hook codex session-start", "timeout": 10 }] }
+    ],
+    "UserPromptSubmit": [
+      { "hooks": [{ "type": "command", "command": "sh \"${PLUGIN_ROOT}/bin/bluer\" hook codex user-prompt-submit", "timeout": 10 }] }
+    ],
+    "PostToolUse": [
+      { "matcher": "Bash", "hooks": [{ "type": "command", "command": "sh \"${PLUGIN_ROOT}/bin/bluer\" hook codex post-tool-use", "timeout": 10 }] }
+    ],
+    "SessionEnd": [
+      { "hooks": [{ "type": "command", "command": "sh \"${PLUGIN_ROOT}/bin/bluer\" hook codex session-end", "timeout": 3 }] }
+    ]
+  }
+}

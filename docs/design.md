@@ -378,14 +378,14 @@ layer. Section 12 explains why this case is still open.
 
 Each agent gets one adapter. An adapter provides:
 
-| Capability | What it does | Claude Code | Gemini CLI |
-|---|---|---|---|
-| Skill folder | Where the agent reads personal skills; bluer links skills there | `~/.claude/skills/<name>`; symlinks work | `~/.agents/skills/<name>`; symlinks work |
-| Chat entry | Commands the user types in chat | A plugin with a `/bluer` skill | An extension with the `bluer` skill and TOML commands |
-| Skill-in-use signal | Which skill is loaded, to count runs and route lessons | `PostToolUse` hook on the `Skill` tool | `AfterTool` hook on the `activate_skill` tool |
-| Message capture | The user's messages, to find answers and corrections | `UserPromptSubmit` hook | `BeforeAgent` hook |
-| Session end | When to run the batch (gate, drift, tests) | `Stop` / `SessionEnd` hooks | `SessionEnd` hook |
-| Headless run | Runs trigger tests | `claude -p --output-format stream-json` | `gemini -p -o stream-json` |
+| Capability | What it does | Claude Code | Gemini CLI | OpenAI Codex |
+|---|---|---|---|---|
+| Skill folder | Where the agent reads personal skills; bluer links skills there | `~/.claude/skills/<name>`; symlinks work | `~/.agents/skills/<name>`; symlinks work | `~/.agents/skills/<name>`; folder symlinks work |
+| Chat entry | Commands the user types in chat | A plugin with a `/bluer` skill | An extension with the `bluer` skill and TOML commands | The Claude Code plugin, through `.codex-plugin/plugin.json` |
+| Skill-in-use signal | Which skill is loaded, to count runs and route lessons | `PostToolUse` hook on the `Skill` tool | `AfterTool` hook on the `activate_skill` tool | `PostToolUse` on `Bash` that reads a `SKILL.md`; `$<skill>` in the prompt |
+| Message capture | The user's messages, to find answers and corrections | `UserPromptSubmit` hook | `BeforeAgent` hook | `UserPromptSubmit` hook |
+| Session end | When to run the batch (gate, drift, tests) | `Stop` / `SessionEnd` hooks | `SessionEnd` hook | `SessionEnd` hook (at most 3 s) |
+| Headless run | Runs trigger tests | `claude -p --output-format stream-json` | `gemini -p -o stream-json` | `codex exec --json`, `codex exec resume --last` |
 
 The hook logic is shared (`src/agents/hooks.ts`). Each adapter gives a small
 dialect: its event names, its skill tool and the input field that names the
@@ -433,6 +433,26 @@ Findings from the Gemini CLI adapter (Gemini CLI 0.68):
 - An extension cannot pre-approve a shell command. The user approves the
   `bluer` command once ("Allow for all future sessions").
 
+Findings from the OpenAI Codex adapter (Codex 0.166, read from its source):
+
+- Codex reads Claude Code plugins and marketplaces (`.claude-plugin/`), and
+  replaces both `${PLUGIN_ROOT}` and `${CLAUDE_PLUGIN_ROOT}` in hook commands.
+  It reads `.codex-plugin/plugin.json` first, so that file points it to a
+  separate hook file whose commands say `hook codex`.
+- Codex has no skill tool. Its prompt lists each skill's `SKILL.md`, and the
+  model reads the file with a shell command, so the `PostToolUse` hook matches
+  `Bash` and looks for `<skill>/SKILL.md` in the command. The model may read a
+  file in parts, so a skill counts one run per session, in every agent.
+- A typed `$<skill>` makes Codex put the file in the context itself, with no
+  tool call, so the prompt hook catches the `$`.
+- Codex runs a plugin's hooks only after the user trusts them. The README tells
+  the user to choose "Trust and continue".
+- Codex ignores `disable-model-invocation`; `agents/openai.yaml` with
+  `policy.allow_implicit_invocation: false` keeps it from loading `new`,
+  `teach` and `status` by itself.
+- `codex debug prompt-input` shows the skills list without a model call. It
+  proves that Codex finds the plugin's skills and a linked bluer skill.
+
 An agent that cannot run a hook on each message gets a fallback: at the end of a
 session (or the start of the next one), the adapter scans the session log for
 lessons. This is enough for a first version of such an adapter.
@@ -470,7 +490,7 @@ Check each agent's current hook and skill support when its adapter is built.
 | Shared skills, `upstream/`, `intent.local.md`, sharing levels | Planned |
 | Secret removal in lessons | Planned |
 | Gemini CLI extension: `bluer` skill, `/bluer:new`, `/bluer:teach`, `/bluer:status`, capture hooks, run counting | Built; tested live with `gemini -p` |
-| OpenAI Codex adapter | Planned (next) |
+| OpenAI Codex adapter: same plugin, Codex manifest and hooks, `$<skill>` | Built; packaging and skills list checked in Codex; live sessions not yet tested |
 | Adapters for other agents (Antigravity, Cursor, Copilot) | Open to contributors |
 
 ## 11. Decision log

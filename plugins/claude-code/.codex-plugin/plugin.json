@@ -1,0 +1,15 @@
+{
+  "name": "bluer",
+  "description": "bluer skills: agent skills you write in three lines, that get better every time they run. Create a skill from plain steps in chat; bluer records what Codex learns while it uses the skill, and folds the good lessons back in.",
+  "keywords": ["skills", "agent-skills", "self-improving", "learning"],
+  "skills": "./skills",
+  "hooks": "./hooks/codex-hooks.json",
+  "interface": {
+    "displayName": "bluer",
+    "shortDescription": "Skills you write in three lines, that get better every time they run",
+    "developerName": "bluer skills",
+    "category": "Productivity",
+    "websiteURL": "https://github.com/BulldromeQ/bluer-skills",
+    "logo": "./.claude-plugin/icon.png"
+  }
+}

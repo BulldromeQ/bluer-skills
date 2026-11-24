@@ -83,6 +83,7 @@ agent_name() {
   case "$1" in
     claude-code) echo "Claude Code" ;;
     gemini-cli) echo "Gemini CLI" ;;
+    codex) echo "Codex" ;;
     *) echo "your agent" ;;
   esac
 }

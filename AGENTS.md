@@ -40,6 +40,13 @@ hooks run the same bundle. `skills/bluer/SKILL.md` is generated from
 (part of `npm run build:plugin`). Edit the Claude Code skill, never the generated
 copy. CI fails when the copy is out of date.
 
+OpenAI Codex installs the same plugin. It reads
+`plugins/claude-code/.codex-plugin/plugin.json` (before `.claude-plugin/`),
+which points it to `hooks/codex-hooks.json`. Keep the two hook files in step.
+To check what Codex sees without a model call, use a scratch home:
+`CODEX_HOME=/tmp/cx/.codex HOME=/tmp/cx codex plugin marketplace add .`, then
+`codex plugin add bluer@bluer-skills` and `codex debug prompt-input "hi"`.
+
 `claude plugin validate .` warns that `BeforeAgent` and `AfterTool` in
 `hooks/hooks.json` are unknown events. Ignore it: that file is for Gemini CLI,
 and the Claude Code marketplace installs only `plugins/claude-code`.

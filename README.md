@@ -1,7 +1,7 @@
 # <img src="plugins/claude-code/.claude-plugin/icon.png" alt="" width="44"> bluer
 
 **bluer skills: agent skills you write in three lines, that get better every time they run.**
-For Claude Code and Gemini CLI today, and OpenAI Codex next.
+For Claude Code, Gemini CLI and OpenAI Codex.
 
 [![CI](https://github.com/BulldromeQ/bluer-skills/actions/workflows/ci.yml/badge.svg)](https://github.com/BulldromeQ/bluer-skills/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -26,8 +26,8 @@ weekly-update learned: "keep it under 150 words". It does this every time now. S
 bluer never changes your own steps, and every change is a version you can roll
 back.
 
-> **Status: early.** It works in Claude Code and Gemini CLI. OpenAI Codex comes
-> next. See the [roadmap](#roadmap).
+> **Status: early.** It works in Claude Code and Gemini CLI. The OpenAI Codex
+> plugin is new and not yet tested in live sessions. See the [roadmap](#roadmap).
 
 ## Get started
 
@@ -35,7 +35,7 @@ back.
 |---|---|---|
 | Claude Code | Works | [Steps](#claude-code) |
 | Gemini CLI | Works | [Steps](#gemini-cli) |
-| OpenAI Codex | Next | Not yet |
+| OpenAI Codex | New, live test pending | [Steps](#openai-codex) |
 | Google Antigravity, Cursor, GitHub Copilot, others | Open to contributors | [Add an agent](docs/adding-an-agent.md) |
 
 You do not need to install anything else first. bluer runs on
@@ -80,6 +80,25 @@ Google is moving Gemini CLI users to Antigravity CLI. Gemini CLI support stays
 for the accounts that still have it. Antigravity reads the same skills folder,
 and an Antigravity adapter is open to contributors.
 
+### OpenAI Codex
+
+1. **Install.** In a terminal, run:
+
+   ```bash
+   codex plugin marketplace add BulldromeQ/bluer-skills
+   codex plugin add bluer@bluer-skills
+   ```
+
+2. **Trust the hooks.** Start Codex. It asks you to review the new plugin's
+   hooks: choose **"Trust and continue"**. (Later, `/hooks` shows them again.)
+   Without this step, skills work but do not learn.
+3. **Make your first skill.** Ask: *"Make a skill for my weekly update email:
+   1. read my notes from this week, 2. write a short summary, 3. email it to my
+   team."*
+4. **Allow bluer once.** When Codex asks before it runs the `bluer` command,
+   choose **"Yes, and don't ask again for commands that start with …"**.
+5. **Use it.** Ask for the task, or type `$weekly-update-email`.
+
 ### Everyday use
 
 Talk to your agent. This works the same in every agent:
@@ -95,6 +114,9 @@ Talk to your agent. This works the same in every agent:
 | Add a step | "Add a step to my weekly update: 4. add my plan for next week" | |
 | Approve each lesson first | "Ask me before my weekly update skill learns something" | |
 | Stop learning | "Stop my weekly update skill from learning" | |
+
+In Codex, type `$` instead of `/` before a skill's name, and ask in plain words
+instead of `/bluer:new`, `/bluer:teach` and `/bluer:status`.
 
 Each time a skill learns something, your agent shows you a one-line receipt.
 
@@ -287,8 +309,9 @@ before it is used, set the skill to `review`.
 
 **Will it ask me to approve commands?** Your agent asks before it runs the
 `bluer` command the first time. In Claude Code, choose "don't ask again" for
-`~/.bluer/bin/bluer`. In Gemini CLI, choose "Allow for all future sessions".
-That path stays the same across updates.
+`~/.bluer/bin/bluer`. In Gemini CLI, choose "Allow for all future sessions". In
+Codex, choose "Yes, and don't ask again for commands that start with …". That
+path stays the same across updates.
 
 **My agent says bluer needs Node.js. What do I do?** Say "set up bluer". Your
 agent asks before it downloads anything. bluer then downloads the official
@@ -306,7 +329,8 @@ planned, and it will always show you the exact text and wait for your yes.
 [learning eval](evals/README.md) runs real agent sessions: stated rules,
 small corrections, one-offs, repeats, undo, thanks and questions, passwords and
 instructions hidden in files. It checks what bluer recorded each time. Claude
-Code with Sonnet passes 23 of 23 ([results](evals/learning/RESULTS.md)).
+Code with Sonnet passes 23 of 23, and shows the receipt in every session that
+changed a lesson ([results](evals/learning/RESULTS.md)).
 
 **Can I use my bluer skills without bluer?** Yes. `SKILL.md` is a normal skill
 file.
@@ -326,7 +350,7 @@ to, keeps rare cases out of the way, and versions every change.
 - [ ] New-skill drafts for work that repeats
 - [ ] Shared skills with a personal layer
 - [x] Gemini CLI extension
-- [ ] OpenAI Codex adapter
+- [x] OpenAI Codex plugin (live test pending)
 - Other agents: open to contributors ([how to add one](docs/adding-an-agent.md))
 
 ## Contributing

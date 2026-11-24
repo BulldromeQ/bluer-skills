@@ -24,9 +24,7 @@ export const geminiCli: AgentAdapter = {
       "post-tool-use": "AfterTool",
       "session-end": "SessionEnd",
     },
-    skillTool: "activate_skill",
-    skillField: "name",
+    skillFromTool: (tool, input) => (tool === "activate_skill" ? String(input.name ?? "") || null : null),
     isOwnSkill: (name) => name === "bluer",
-    slashSkipsTool: false,
   },
 };
