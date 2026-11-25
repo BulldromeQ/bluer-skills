@@ -42,11 +42,20 @@ To check what Codex sees without a model call, use a scratch home:
 Test the plugin by hand with Claude Code's own tools:
 
 ```bash
-claude plugin validate ./plugins/claude-code
-claude plugin validate .
+claude plugin validate ./plugins/claude-code --strict --profile directory
+claude plugin validate . --strict
 BLUER_HOME=/tmp/bt/bluer BLUER_USER_HOME=/tmp/bt/user \
   claude --plugin-dir ./plugins/claude-code
 ```
+
+The first command also runs the checks of Claude's plugin directory. The
+directory shows `plugins/claude-code/README.md` as the listing text, so keep
+its "What the plugin runs, reads and writes" section true when the plugin
+starts to run, read, write or fetch something new.
+
+Claude Code updates an installed plugin only when `version` in
+`plugins/claude-code/.claude-plugin/plugin.json` changes. To release, raise it
+together with `version` in `package.json`, then tag the commit `v<version>`.
 
 `evals/learning` runs real agent sessions to check what the agent records; see
 `evals/README.md`. Run it after a change to the hook notes

@@ -42,7 +42,7 @@ Then start Codex and trust the plugin's hooks when it asks.
 |---|---|
 | `skills/bluer` | Teaches Claude how to create skills, record lessons and stay within the rules |
 | `skills/new`, `teach`, `status` | Short commands that load the `bluer` skill |
-| `hooks/hooks.json` | `SessionStart` writes `~/.bluer/bin/bluer`; `PostToolUse` (Skill) counts a run and tells Claude how to record lessons; `UserPromptSubmit` reminds Claude when a message looks like a lesson; `SessionEnd` rebuilds the skills used |
+| `hooks/hooks.json` | `SessionStart` writes `~/.bluer/bin/bluer` and checks for Node.js; `PostToolUse` (Skill) counts a run of a bluer skill and gives Claude its known lessons; `UserPromptSubmit` adds a short note on how to record lessons, only while a bluer skill is in use; `SessionEnd` rebuilds the skills used |
 | `bin/bluer`, `bin/bluer.mjs` | `bin/bluer` finds Node.js and runs `setup`; `bin/bluer.mjs` is the bluer CLI, bundled into one file. Built from `src/` with `npm run build:plugin`; do not edit it by hand |
 | `.codex-plugin/plugin.json`, `hooks/codex-hooks.json` | What Codex reads instead of `.claude-plugin/plugin.json` and `hooks/hooks.json`: the same skills, with hooks that run as `bluer hook codex` |
 | `skills/*/agents/openai.yaml` | Tells Codex to load `new`, `teach` and `status` only when the user asks for them |
@@ -57,7 +57,20 @@ search.
 from nodejs.org, checks its SHA-256 against the pin, and keeps only `bin/node`
 in `~/.bluer/runtime`. bluer uses that Node.js first. It does not change PATH.
 
-## Privacy
+## What the plugin runs, reads and writes
 
-Everything stays on your machine, in `~/.bluer`. The plugin sends nothing
-anywhere.
+- **Runs:** Node.js (to run `bin/bluer.mjs`) and `git` (to keep versions of
+  your skills in `~/.bluer`). `bin/bluer setup` also runs `curl` or `wget`,
+  `shasum` or `sha256sum`, and `tar`.
+- **Reads:** the files in `~/.bluer`; the hook input that Claude Code sends;
+  and the last reply in the current session log, to tell if Claude asked you a
+  question.
+- **Writes:** `~/.bluer` (your skills, lessons, versions, settings, and the
+  `bluer` command in `~/.bluer/bin`), and links to your skills in
+  `~/.claude/skills` and `~/.agents/skills`. It never changes PATH or your
+  shell settings.
+- **Fetches:** nothing, except when you run `bluer setup`: then it downloads
+  the pinned Node.js release from nodejs.org (or `BLUER_NODE_MIRROR`, if you
+  set it). Claude asks you before it runs this.
+- **Sends:** nothing. bluer has no server and no telemetry. Your skills and
+  lessons stay on your machine.

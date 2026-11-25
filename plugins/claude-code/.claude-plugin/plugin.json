@@ -1,5 +1,7 @@
 {
   "name": "bluer",
+  "displayName": "bluer skills",
+  "version": "0.1.0",
   "description": "bluer skills: agent skills you write in plain steps, that improve themselves with use. Create a skill from a few lines, and bluer records what your agent learns while it uses the skill.",
   "author": {
     "name": "BulldromeQ"
@@ -14,5 +16,10 @@
     "self-improving",
     "learning",
     "agent-skills"
-  ]
+  ],
+  "network": {
+    "hosts": [
+      "nodejs.org"
+    ]
+  }
 }
